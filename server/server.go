@@ -6,6 +6,7 @@ import (
 	"net/http"
 
 	"github.com/go-chi/chi"
+	"github.com/go-chi/chi/middleware"
 )
 
 type Server struct {
@@ -38,6 +39,8 @@ func (s *Server) POST(pattern string, handlerFn http.HandlerFunc) {
 }
 
 func (s *Server) SetupRoutes() {
+	s.Router.Use(middleware.Logger)
+
 	s.GET("/", func(w http.ResponseWriter, r *http.Request) {
 		fmt.Fprintf(w, "Hello\n")
 	})

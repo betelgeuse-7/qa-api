@@ -26,5 +26,7 @@ func main() {
 		panic(err)
 	}
 
-	s.StartUnsecure()
+	if err := s.StartUnsecure(); err != nil {
+		panic(err)
+	}
 }

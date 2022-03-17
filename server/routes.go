@@ -14,4 +14,5 @@ func (s *Server) SetupRoutes() {
 	)
 
 	s.POST("/api/register", handlers.NewUser)
+	s.POST("/api/question", handlers.NewQuestion)
 }

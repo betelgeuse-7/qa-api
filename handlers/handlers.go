@@ -2,7 +2,7 @@ package handlers
 
 import (
 	"encoding/json"
-	"log"
+	"fmt"
 	"net/http"
 	"qa/models"
 
@@ -11,25 +11,23 @@ import (
 
 /* -------------------- USERS -------------------- */
 
+func GetUserProfile(w http.ResponseWriter, r *http.Request) {}
+
 func NewUser(w http.ResponseWriter, r *http.Request) {
 	u := &models.User{}
 	json.NewDecoder(r.Body).Decode(u)
 
 	hashBx, err := bcrypt.GenerateFromPassword([]byte(u.Password), bcrypt.DefaultCost)
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Printf("bcrypt hash error: %s\n", err.Error())
+		http500(w, fmt.Errorf("bcrypt hash error: %s", err.Error()))
 		return
 	}
-
-	liid, err := u.Insert(string(hashBx))
+	err = u.Insert(string(hashBx))
 	if err != nil {
-		w.WriteHeader(http.StatusInternalServerError)
-		log.Println(err.Error())
+		http500(w, err)
 		return
 	}
-
-	newMessage(liid).sendJSON(w)
+	newMessage("new user registered successfully").sendJSON(w)
 }
 
 func DeleteUser(w http.ResponseWriter, r *http.Request) {

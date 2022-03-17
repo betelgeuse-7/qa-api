@@ -1,9 +1,9 @@
 CREATE TABLE users (
     user_id serial primary key,
-    username varchar(255) not null, 
-    email varchar(255) not null,
+    username varchar(255) unique not null, 
+    email varchar(255) unique not null,
     password text not null,
-    handle varchar(255) not null,
+    handle varchar(255) unique not null,
     last_online timestamp with time zone, 
     created_at timestamp with time zone default CURRENT_TIMESTAMP,
     deleted_at timestamp with time zone

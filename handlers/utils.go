@@ -4,6 +4,8 @@ import (
 	"encoding/json"
 	"fmt"
 	"io"
+	"log"
+	"net/http"
 )
 
 type message struct {
@@ -26,4 +28,10 @@ func (m *message) json() string {
 		return fmt.Sprintf("ERR: %s", err.Error())
 	}
 	return string(bx)
+}
+
+// give http.StatusInternalServerError to w, and log error to os.Stdout
+func http500(w http.ResponseWriter, err error) {
+	w.WriteHeader(http.StatusInternalServerError)
+	log.Println(err)
 }

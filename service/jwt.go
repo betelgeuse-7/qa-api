@@ -7,5 +7,5 @@ type JWTToken struct {
 }
 
 func ValidateJWT(tokenStr string) (JWTToken, error) {
-
+	return JWTToken{}, nil
 }

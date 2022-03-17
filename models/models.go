@@ -2,10 +2,6 @@ package models
 
 import "time"
 
-type Model interface {
-	GetById(id uint) (Model, error)
-}
-
 type BaseModel struct {
 	CreatedAt time.Time `json:"created_at" db:"created_at"`
 	DeletedAt time.Time `json:"deleted_at" db:"deleted_at"`
@@ -17,6 +13,7 @@ type User struct {
 	UserId     uint      `json:"user_id" db:"user_id"`
 	Username   string    `json:"username" db:"username"`
 	Email      string    `json:"email" db:"email"`
+	Password   string    `json:"password,omitempty"`
 	Handle     string    `json:"handle" db:"handle"`
 	LastOnline time.Time `json:"last_online" db:"last_online"`
 }

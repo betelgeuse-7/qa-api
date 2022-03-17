@@ -1,36 +1,33 @@
 package models
 
-import "github.com/doug-martin/goqu"
-
-/*
-type Table uint
-
-const (
-	USERS Table = iota
-	QUESTIONS
-	ANSWERS
+import (
+	sq "github.com/Masterminds/squirrel"
+	"github.com/jmoiron/sqlx"
 )
 
-func (t Table) String() string {
-	switch t {
-	case USERS:
-		return "users"
-	case QUESTIONS:
-		return "questions"
-	default:
-		return "answers"
-	}
-}
-*/
+var DB *sqlx.DB
 
-func (u *User) GetById(id uint) /*(*User, error)*/ string {
-	query, _, err := goqu.From("users").Prepared(true).Where(goqu.Ex{
-		"user_id": id,
-	}).ToSql()
+func RegisterPostgresDB(db *sqlx.DB) {
+	DB = db
+}
+
+func (u *User) Insert(hashedPwd string) (int64, error) {
+	q, args, err := sq.Insert("users").Columns("username", "email", "password", "handle").
+		Values(u.Username, u.Email, hashedPwd, u.Handle).ToSql()
 
 	if err != nil {
-		return "panic(err)"
+		return 0, err_QUERY_BUILDING_FAIL()
 	}
 
-	return query
+	res, err := DB.Exec(q, args...)
+	if err != nil {
+		return 0, err_DB_EXEC_FAIL(err)
+	}
+
+	lastInsertedId, err := res.LastInsertId()
+	if err != nil {
+		return -1, nil
+	}
+
+	return lastInsertedId, nil
 }

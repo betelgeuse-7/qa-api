@@ -3,6 +3,7 @@ package main
 import (
 	"qa/conf"
 	"qa/database"
+	"qa/models"
 	"qa/server"
 
 	"github.com/go-chi/chi"
@@ -24,6 +25,9 @@ func main() {
 	if err := db.Ping(); err != nil {
 		panic(err)
 	}
+
+	models.RegisterPostgresDB(db)
+
 	if err := s.StartUnsecure(); err != nil {
 		panic(err)
 	}

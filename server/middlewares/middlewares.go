@@ -15,6 +15,7 @@ func JWTAuthorization(next http.Handler) http.Handler {
 		authHeaderSplit := strings.Split(authHeader, " ")
 		if authHeaderSplit[0] != "Bearer " {
 			w.WriteHeader(http.StatusUnauthorized)
+			w.Write([]byte("not authorized :("))
 			return
 		}
 		// get token from authHeader

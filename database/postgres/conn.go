@@ -1,23 +1,11 @@
-package database
+package postgres
 
 import (
 	"fmt"
 	"qa/conf"
 
 	"github.com/jmoiron/sqlx"
-
-	_ "github.com/lib/pq"
 )
-
-type DbType int
-
-const (
-	POSTGRES DbType = iota
-)
-
-type Database interface {
-	Connect() (*sqlx.DB, error)
-}
 
 type Postgres struct {
 	User, DbName, Host, Password string
@@ -25,18 +13,15 @@ type Postgres struct {
 	SslMode                      bool
 }
 
-func NewDatabase(engine DbType, config *conf.Config) Database {
-	if engine == POSTGRES {
-		return &Postgres{
-			User:     config.DB.User,
-			Password: config.DB.Password,
-			DbName:   config.DB.DbName,
-			Host:     config.DB.Host,
-			Port:     config.DB.Port,
-			SslMode:  config.DB.SslMode,
-		}
+func NewPostgres(config *conf.Config) *Postgres {
+	return &Postgres{
+		User:     config.DB.User,
+		Password: config.DB.Password,
+		DbName:   config.DB.DbName,
+		Host:     config.DB.Host,
+		Port:     config.DB.Port,
+		SslMode:  config.DB.SslMode,
 	}
-	panic("DB engine not supported")
 }
 
 func (p *Postgres) connString() string {

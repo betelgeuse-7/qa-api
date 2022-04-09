@@ -36,3 +36,11 @@ func (s *Server) GET(pattern string, handlerFn http.HandlerFunc) {
 func (s *Server) POST(pattern string, handlerFn http.HandlerFunc) {
 	s.Router.Post(pattern, handlerFn)
 }
+
+func (s *Server) DELETE(pattern string, handlerFn http.HandlerFunc) {
+	s.Router.Delete(pattern, handlerFn)
+}
+
+func (s *Server) PUT(pattern string, handlerFn http.HandlerFunc) {
+	s.Router.Put(pattern, handlerFn)
+}

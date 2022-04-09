@@ -2,7 +2,7 @@ package main
 
 import (
 	"qa/conf"
-	"qa/database"
+	"qa/database/postgres"
 	"qa/models"
 	"qa/server"
 
@@ -18,7 +18,7 @@ func main() {
 	s := server.NewServer(config.Port, chi.NewRouter())
 	s.SetupRoutes()
 
-	db, err := database.NewDatabase(database.POSTGRES, config).Connect()
+	db, err := postgres.NewPostgres(config).Connect()
 	if err != nil {
 		panic(err)
 	}

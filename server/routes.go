@@ -15,6 +15,7 @@ func (s *Server) SetupRoutes() {
 
 	s.GET("/api/user/{handle}", handlers.GetUser)
 	s.POST("/api/register", handlers.NewUser)
+	s.POST("/api/login", handlers.Login)
 	s.DELETE("/api/user/{handle}", handlers.DeleteUser)
 	s.PUT("/api/user/{handle}", handlers.UpdateUser)
 

@@ -52,23 +52,19 @@ func (u *User) GetUser() error {
 		}
 		return err_DB_EXEC_FAIL(err)
 	}
-
 	return nil
 }
 
-// TODO this requires authorization
 func (u *User) Delete() error {
 	if len(u.Handle) < 1 {
 		return errors.New("no user handle. need one")
 	}
-
 	q, args, err := sq.Update("users").Set("deleted_at", time.Now()).Where(sq.Eq{
 		"handle": u.Handle,
 	}).ToSql()
 	if err != nil {
 		return err_QUERY_BUILDING_FAIL()
 	}
-
 	q = DB.Rebind(q)
 	_, err = DB.Exec(q, args...)
 	if err != nil {
@@ -77,58 +73,37 @@ func (u *User) Delete() error {
 		}
 		return err_DB_EXEC_FAIL(err)
 	}
-
 	return nil
 }
 
-type updatableUserField uint
+// populate UserId and Password fields of u
+func (u *User) GetPassword() error {
+	email := u.Email
+	username := u.Username
+	which := ""    // which field
+	whichVal := "" // that field's value
 
-const (
-	_USERNAME updatableUserField = iota
-	_EMAIL
-	_PASSWORD
-	_HANDLE
-)
-
-func (u *User) update(field updatableUserField, newValue string) error {
-	updateBuilder := sq.Update("users")
-
-	switch field {
-	case _USERNAME:
-		q, args, err := updateBuilder.Set("username", newValue).Where(sq.Eq{
-			"handle": u.Handle,
-		}).ToSql()
-		if err != nil {
-			return err_QUERY_BUILDING_FAIL()
-		}
-		q = DB.Rebind(q)
-		_, err = DB.Exec(q, args...)
-		if err != nil {
-			if err == sql.ErrNoRows {
-				return err
-			}
-			return err_DB_EXEC_FAIL(err)
-		}
-		return nil
+	if len(email) > 0 {
+		which = "email"
+		whichVal = email
 	}
-
-	panic("not implemented")
-}
-
-func (u *User) UpdateUsername(newUsername string) error {
-	return u.update(_USERNAME, newUsername)
-}
-
-func (u *User) UpdateEmail(newEmail string) error {
-	return u.update(_EMAIL, newEmail)
-}
-
-// don't forget @
-func (u *User) UpdateHandle(newHandle string) error {
-	return u.update(_HANDLE, newHandle)
-}
-
-// this is a bit more complex
-func (u *User) UpdatePassword(newPassword string) error {
-	return u.update(_PASSWORD, newPassword)
+	if len(username) > 0 {
+		which = "username"
+		whichVal = username
+	}
+	q, args, err := sq.Select("user_id, password").From("users").Where(sq.Eq{
+		which: whichVal, "deleted_at": nil,
+	}).ToSql()
+	if err != nil {
+		return err_QUERY_BUILDING_FAIL()
+	}
+	q = DB.Rebind(q)
+	err = sqlx.Get(DB, u, q, args...)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			return err
+		}
+		return err_DB_EXEC_FAIL(err)
+	}
+	return nil
 }

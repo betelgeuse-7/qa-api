@@ -1,0 +1,21 @@
+{
+    "relationalDB": {
+        "name": "postgresql",
+        "host": "localhost",
+        "port": 5432,
+        "user": "postgres",
+        "ssl": "disable", 
+        "dbname": "qa"
+    },
+    "auth": {
+        "jwt": {
+            "secretKeyFile": "./JWT_SECRET_KEY",
+            "expiry": "4 days"
+        }
+    },
+    "httpServer": {
+        "httpVersion": "HTTP/2",
+        "useTLS": false, 
+        "port": ":8000"
+    }
+}

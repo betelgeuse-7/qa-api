@@ -16,10 +16,12 @@ func NewEngine(engine *gin.Engine) *Engine {
 
 func (e *Engine) SetRESTRoutes() {
 	r := e.ginEngine
+	v1 := r.Group("api/v1")
 
-	r.GET("/api/v1", func(ctx *gin.Context) {
-		ctx.JSON(http.StatusOK, gin.H{
-			"message": "hello client!",
-		})
+	v1.GET("/hello", func(c *gin.Context) {
+		c.JSON(http.StatusOK, gin.H{"msg": "hello client!"})
 	})
+	users := v1.Group("/users")
+	users.GET("/:username", GetUser)
+	users.POST("/", NewUser)
 }

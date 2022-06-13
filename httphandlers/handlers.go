@@ -21,7 +21,7 @@ func (e *Engine) SetRESTRoutes() {
 	v1.GET("/hello", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"msg": "hello client!"})
 	})
+
 	users := v1.Group("/users")
-	users.GET("/:username", GetUser)
 	users.POST("/", NewUser)
 }

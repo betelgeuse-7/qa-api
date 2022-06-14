@@ -7,10 +7,11 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
-func NewUser(c *gin.Context) {
+func (h *Handler) NewUser(c *gin.Context) {
 	_, err := c.Writer.Write([]byte("NEW USER"))
 	if err != nil {
 		c.Writer.WriteHeader(http.StatusInternalServerError)
 		logger.Error(err.Error())
 	}
+	//h.userRepo.Register()
 }

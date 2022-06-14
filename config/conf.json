@@ -16,6 +16,7 @@
     "httpServer": {
         "httpVersion": "HTTP/2",
         "useTLS": false, 
-        "port": ":8000"
+        "port": ":8000",
+        "devMode": true
     }
 }

@@ -41,4 +41,5 @@ type ConfigHttpServer struct {
 	HttpVersion string
 	Port        string
 	UseTLS      bool
+	DevMode     bool
 }

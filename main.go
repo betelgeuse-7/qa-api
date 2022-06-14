@@ -10,5 +10,5 @@ func main() {
 	if err := conf.Parse("./config/conf.json"); err != nil {
 		panic("Parsing conf.json: " + err.Error() + "\n")
 	}
-	cmd.RunQARestAPI(conf.HttpServer)
+	cmd.RunQARestAPI(conf.HttpServer, &conf.RelationalDB)
 }

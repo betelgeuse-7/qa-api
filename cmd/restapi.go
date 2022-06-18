@@ -7,6 +7,7 @@ import (
 	"github.com/betelgeuse-7/qa/httphandlers"
 	"github.com/betelgeuse-7/qa/service/logger"
 	"github.com/gin-gonic/gin"
+	_ "github.com/lib/pq"
 )
 
 func RunQARestAPI(httpServerConf config.ConfigHttpServer, relationalDbConf *config.ConfigRelationalDB) {

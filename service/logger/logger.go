@@ -1,6 +1,7 @@
 package logger
 
 import (
+	"fmt"
 	"io"
 	"log"
 )
@@ -34,5 +35,21 @@ func log_(msg string, level logLevel) {
 	l.l.Println(msg)
 }
 
-func Info(msg string)  { log_(msg, _INFO) }
-func Error(msg string) { log_(msg, _ERROR) }
+func logf_(level logLevel, msg string, args ...interface{}) {
+	log_(fmt.Sprintf(msg, args...), level)
+}
+
+func Info(msg string, args ...interface{}) {
+	if len(args) > 0 {
+		logf_(_INFO, msg, args...)
+	} else {
+		log_(msg, _INFO)
+	}
+}
+func Error(msg string, args ...interface{}) {
+	if len(args) > 0 {
+		logf_(_ERROR, msg, args...)
+	} else {
+		log_(msg, _ERROR)
+	}
+}

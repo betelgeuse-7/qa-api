@@ -4,6 +4,7 @@ import (
 	"net/http"
 
 	"github.com/betelgeuse-7/qa/config"
+	"github.com/betelgeuse-7/qa/service/sqlbuild"
 	"github.com/betelgeuse-7/qa/storage/models"
 	"github.com/betelgeuse-7/qa/storage/postgres"
 	"github.com/gin-gonic/gin"
@@ -28,12 +29,16 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB) erro
 	if err != nil {
 		return err
 	}
-	userRepo := models.NewUserRepo(pg.Db)
+	err = pg.Connect()
+	if err != nil {
+		return err
+	}
+	sqlbuilder := sqlbuild.New()
+	userRepo := models.NewUserRepo(pg.Db, sqlbuilder)
 	h := &Handler{userRepo: userRepo}
 	v1.GET("/hello", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"msg": "hello client!"})
 	})
-
 	users := v1.Group("/users")
 	users.POST("/", h.NewUser)
 	return nil

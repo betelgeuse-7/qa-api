@@ -3,9 +3,11 @@ package httphandlers
 import (
 	"net/http"
 
-	"github.com/betelgeuse-7/qa/service/logger"
+	"github.com/betelgeuse-7/qa/service/jwtauth"
 	"github.com/betelgeuse-7/qa/storage/models"
+	"github.com/betelgeuse-7/qa/storage/postgres"
 	"github.com/gin-gonic/gin"
+	pq "github.com/lib/pq"
 )
 
 func (h *Handler) NewUser(c *gin.Context) {
@@ -13,7 +15,7 @@ func (h *Handler) NewUser(c *gin.Context) {
 	err := c.BindJSON(urp)
 	if err != nil {
 		c.Status(http.StatusInternalServerError)
-		logger.Error("NewUser: %s\n", err.Error())
+		h.logger.Error("NewUser: %s\n", err.Error())
 		return
 	}
 	errs := urp.Validate()
@@ -21,11 +23,28 @@ func (h *Handler) NewUser(c *gin.Context) {
 		c.JSON(http.StatusBadRequest, gin.H{"errors": errs})
 		return
 	}
-	if err := h.userRepo.Register(urp); err != nil {
+	userId, err := h.userRepo.Register(urp)
+	if err != nil {
+		if pqError, ok := err.(*pq.Error); ok && pqError.Code == postgres.ERROR_UNIQUE_VIOLATION {
+			c.String(http.StatusBadRequest, "this user already exists")
+			h.logger.Info("NewUser: tried to insert duplicate entry\n")
+			return
+		}
 		c.Status(http.StatusInternalServerError)
-		logger.Error("NewUser: %s\n", err.Error())
+		h.logger.Error("NewUser: %s\n", err.Error())
 		return
 	}
-	// TODO also return an access, and a refresh token
-	c.JSON(http.StatusCreated, gin.H{"message": "user registered successfully"})
+	at, err := h.jwtRepo.NewToken(userId, jwtauth.NewAccessToken)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("NewUser: %s\n", err.Error())
+		return
+	}
+	rt, err := h.jwtRepo.NewToken(userId, jwtauth.NewRefreshToken)
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("NewUser: %s\n", err.Error())
+		return
+	}
+	c.JSON(http.StatusCreated, gin.H{"message": "user registered successfully", "access_token": at, "refresh_token": rt})
 }

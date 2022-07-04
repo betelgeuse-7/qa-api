@@ -12,7 +12,7 @@ CREATE TABLE users (
 CREATE TABLE questions (
     question_id serial primary key,
     title varchar(500) not null,
-    text text not null
+    text text not null,
     question_by int references users(user_id),
     created_at timestamp with time zone default CURRENT_TIMESTAMP,
     deleted_at timestamp with time zone
@@ -66,9 +66,19 @@ CREATE TABLE answer_downvotes (
     PRIMARY KEY(answer_id, downvote_by)
 );
 
-CREATE TABLE comments (
+CREATE TABLE comments_to_question (
     comment_id serial primary key,
     text text not null,
+    to_question int references questions(question_id),
+    comment_by int references users(user_id),
+    created_at timestamp with time zone default CURRENT_TIMESTAMP,
+    deleted_at timestamp with time zone
+);
+
+CREATE TABLE comments_to_answer (
+    comment_id serial primary key,
+    text text not null,
+    to_answer int references answers(answer_id),
     comment_by int references users(user_id),
     created_at timestamp with time zone default CURRENT_TIMESTAMP,
     deleted_at timestamp with time zone

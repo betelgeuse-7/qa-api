@@ -7,6 +7,12 @@ import (
 
 	"github.com/betelgeuse-7/qa/config"
 	"github.com/jmoiron/sqlx"
+	"github.com/lib/pq"
+)
+
+// https://www.postgresql.org/docs/current/errcodes-appendix.html
+const (
+	ERROR_UNIQUE_VIOLATION = pq.ErrorCode("23505")
 )
 
 type Postgres struct {

@@ -8,8 +8,12 @@ import (
 
 type logLevel uint
 
-type logger struct {
-	l log.Logger
+type Logger struct {
+	l *log.Logger
+}
+
+func NewLogger(l *log.Logger) *Logger {
+	return &Logger{l: l}
 }
 
 const (
@@ -17,13 +21,11 @@ const (
 	_ERROR
 )
 
-var l *logger = &logger{l: *log.Default()}
-
-func SetOut(out io.Writer) {
+func (l *Logger) SetOut(out io.Writer) {
 	l.l.SetOutput(out)
 }
 
-func log_(msg string, level logLevel) {
+func log_(l *Logger, msg string, level logLevel) {
 	prefix := ""
 	switch level {
 	case _INFO:
@@ -35,21 +37,21 @@ func log_(msg string, level logLevel) {
 	l.l.Println(msg)
 }
 
-func logf_(level logLevel, msg string, args ...interface{}) {
-	log_(fmt.Sprintf(msg, args...), level)
+func logf_(l *Logger, level logLevel, msg string, args ...interface{}) {
+	log_(l, fmt.Sprintf(msg, args...), level)
 }
 
-func Info(msg string, args ...interface{}) {
+func (l *Logger) Info(msg string, args ...interface{}) {
 	if len(args) > 0 {
-		logf_(_INFO, msg, args...)
+		logf_(l, _INFO, msg, args...)
 	} else {
-		log_(msg, _INFO)
+		log_(l, msg, _INFO)
 	}
 }
-func Error(msg string, args ...interface{}) {
+func (l *Logger) Error(msg string, args ...interface{}) {
 	if len(args) > 0 {
-		logf_(_ERROR, msg, args...)
+		logf_(l, _ERROR, msg, args...)
 	} else {
-		log_(msg, _ERROR)
+		log_(l, msg, _ERROR)
 	}
 }

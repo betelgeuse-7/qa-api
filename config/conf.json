@@ -9,8 +9,7 @@
     },
     "auth": {
         "jwt": {
-            "secretKeyFile": "./JWT_SECRET_KEY",
-            "expiry": "4 days"
+            "secret_key": ""
         }
     },
     "httpServer": {

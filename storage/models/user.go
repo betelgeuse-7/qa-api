@@ -1,6 +1,7 @@
 package models
 
 import (
+	"strings"
 	"time"
 
 	"github.com/Masterminds/squirrel"
@@ -10,7 +11,7 @@ import (
 )
 
 type UserRepository interface {
-	Register(*UserRegisterPayload) error
+	Register(*UserRegisterPayload) (int64, error)
 }
 
 type UserRepo struct {
@@ -37,13 +38,15 @@ func (u *UserRegisterPayload) Validate() []string {
 	if len(u.Email) == 0 {
 		errs = append(errs, "missing email")
 	}
-	if len(u.Password) < 6 {
+	if len(u.Password) == 0 {
+		errs = append(errs, "missing password")
+	} else if len(u.Password) < 6 {
 		errs = append(errs, "password not long enough")
 	}
 	if len(u.Handle) == 0 {
 		errs = append(errs, "missing handle")
 	}
-	if u.Handle[0] == '@' {
+	if ok := strings.HasPrefix(u.Handle, "@"); ok {
 		errs = append(errs, "handle cannot start with '@'")
 	}
 	return errs
@@ -64,20 +67,32 @@ type UserProfileResponse struct {
 	LastAnswers   []*SingleAnswer   `json:"last_answers"`
 }
 
-func (u *UserRepo) Register(payload *UserRegisterPayload) error {
+func (u *UserRepo) Register(payload *UserRegisterPayload) (int64, error) {
 	hasher := hashpwd.New(payload.Password)
 	hasher.HashPwd()
 	if err := hasher.Error(); err != nil {
-		return err
+		return -1, err
 	}
 	payload.Password = hasher.Hashed()
 	q, args, _ := u.sqlbuilder.Insert("users").
 		Columns("username", "email", "handle", "password").
 		Values(payload.Username, payload.Email, payload.Handle, payload.Password).
+		Suffix("RETURNING user_id").
 		ToSql()
-	_, err := u.db.Exec(q, args...)
+	// begin a transaction here, to make sure we don't insert a new row, in case we can't get the
+	// last inserted id. getting last inserted id is important, because we need it to build access,
+	// and refresh tokens upon registration.
+	tx, err := u.db.Begin()
 	if err != nil {
-		return err
+		return -1, err
 	}
-	return nil
+	var userId int64
+	row := tx.QueryRow(q, args...)
+	err = row.Scan(&userId)
+	if err != nil {
+		tx.Rollback()
+		return -1, err
+	}
+	tx.Commit()
+	return userId, nil
 }

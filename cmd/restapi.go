@@ -5,18 +5,17 @@ import (
 
 	"github.com/betelgeuse-7/qa/config"
 	"github.com/betelgeuse-7/qa/httphandlers"
-	"github.com/betelgeuse-7/qa/service/logger"
 	"github.com/gin-gonic/gin"
 	_ "github.com/lib/pq"
 )
 
-func RunQARestAPI(httpServerConf config.ConfigHttpServer, relationalDbConf *config.ConfigRelationalDB) {
-	if !(httpServerConf.DevMode) {
+func RunQARestAPI(conf *config.AppConfig) {
+	if !(conf.HttpServer.DevMode) {
 		// in release/prod mode
 		gin.SetMode(gin.ReleaseMode)
 	}
 	r := gin.Default()
-	if !(httpServerConf.UseTLS) {
+	if !(conf.HttpServer.UseTLS) {
 		// if useTLS is false, use H2C (HTTP/2 without TLS)
 		// but browsers don't support H2C, and, even if we use
 		// H2C, we still communicate with web browsers via HTTP/1.1
@@ -25,9 +24,9 @@ func RunQARestAPI(httpServerConf config.ConfigHttpServer, relationalDbConf *conf
 		r.UseH2C = true
 	}
 	e := httphandlers.NewEngine(r)
-	if err := e.SetRESTRoutes(relationalDbConf); err != nil {
-		logger.Error("cmd/restapi.go: couldn't set REST routes: " + err.Error() + "\n")
+	if err := e.SetRESTRoutes(&conf.RelationalDB, &conf.Auth.Jwt); err != nil {
+		log.Printf("[ERROR] cmd/restapi.go: couldn't set REST routes: %s\n", err.Error())
 		return
 	}
-	log.Fatalln(r.Run(httpServerConf.Port))
+	log.Fatalln(r.Run(conf.HttpServer.Port))
 }

@@ -2,6 +2,7 @@ package config
 
 import (
 	"encoding/json"
+	"errors"
 	"fmt"
 	"os"
 	"path/filepath"
@@ -21,7 +22,16 @@ func (a *AppConfig) Parse(file string) error {
 	if err != nil {
 		return err
 	}
-	return json.Unmarshal(bx, a)
+	err = json.Unmarshal(bx, a)
+	if err != nil {
+		return err
+	}
+	jwtSecret := os.Getenv("JWT_SECRET")
+	if len(jwtSecret) == 0 {
+		return errors.New("env variable 'JWT_SECRET' is not set")
+	}
+	a.Auth.Jwt.SecretKey = []byte(jwtSecret)
+	return nil
 }
 
 type ConfigRelationalDB struct {
@@ -34,7 +44,7 @@ type ConfigAuth struct {
 }
 
 type ConfigJwt struct {
-	SecretKeyFile, Expiry string
+	SecretKey []byte
 }
 
 type ConfigHttpServer struct {

@@ -46,5 +46,9 @@ func (h *Handler) NewUser(c *gin.Context) {
 		h.logger.Error("NewUser: %s\n", err.Error())
 		return
 	}
-	c.JSON(http.StatusCreated, gin.H{"message": "user registered successfully", "access_token": at, "refresh_token": rt})
+	cookieSecure := false
+	cookieHttpOnly := true
+	c.SetCookie("access-token", at, int(jwtauth.AT_EXPIRY.Seconds()), "/", h.domain, cookieSecure, cookieHttpOnly)
+	c.SetCookie("refresh-token", rt, int(jwtauth.RT_EXPIRY.Seconds()), "/", h.domain, cookieSecure, cookieHttpOnly)
+	c.JSON(http.StatusCreated, gin.H{"message": "user registered successfully"})
 }

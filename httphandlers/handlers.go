@@ -3,6 +3,7 @@ package httphandlers
 import (
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/betelgeuse-7/qa/config"
 	"github.com/betelgeuse-7/qa/service/jwtauth"
@@ -25,6 +26,7 @@ type Handler struct {
 	userRepo models.UserRepository
 	jwtRepo  *jwtauth.TokenRepo
 	logger   *logger.Logger
+	domain   string
 }
 
 func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtConf *config.ConfigJwt) error {
@@ -42,7 +44,12 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 	userRepo := models.NewUserRepo(pg.Db, sqlbuilder)
 	jwtRepo := jwtauth.NewTokenRepo(jwtConf)
 	logger := logger.NewLogger(log.Default())
-	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger}
+	domain := os.Getenv("DOMAIN")
+	if domain == "" {
+		domain = "127.0.0.1"
+		log.Println("[INFO] Server domain is not set. Set to '127.0.0.1' by default")
+	}
+	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger, domain: domain}
 	v1.GET("/hello", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"msg": "hello client!"})
 	})

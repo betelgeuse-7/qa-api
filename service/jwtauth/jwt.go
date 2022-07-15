@@ -9,9 +9,9 @@ import (
 )
 
 const (
-	_AT_EXPIRY = time.Hour * 2
+	AT_EXPIRY = time.Hour * 2
 	// 3 days
-	_RT_EXPIRY = (time.Hour * 24) * 3
+	RT_EXPIRY = (time.Hour * 24) * 3
 )
 
 type TokenRepo struct {
@@ -50,13 +50,13 @@ func newToken(tr *TokenRepo, type_ string, userId int64) (string, error) {
 	switch type_ {
 	case "access":
 		atClaims := &AccessToken{StandardClaims: &jwt.StandardClaims{
-			ExpiresAt: _AT_EXPIRY.Milliseconds(),
+			ExpiresAt: time.Now().Add(AT_EXPIRY).Unix(),
 		}, UserId: userId}
 		t := jwt.NewWithClaims(jwt.SigningMethodHS256, atClaims)
 		return t.SignedString(tr.cfg.SecretKey)
 	case "refresh":
 		rtClaims := &RefreshToken{StandardClaims: &jwt.StandardClaims{
-			ExpiresAt: _RT_EXPIRY.Milliseconds(),
+			ExpiresAt: time.Now().Add(RT_EXPIRY).Unix(),
 		}, UserId: userId}
 		t := jwt.NewWithClaims(jwt.SigningMethodHS256, rtClaims)
 		return t.SignedString(tr.cfg.SecretKey)

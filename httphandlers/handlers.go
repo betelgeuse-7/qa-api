@@ -23,10 +23,10 @@ func NewEngine(engine *gin.Engine) *Engine {
 }
 
 type Handler struct {
-	userRepo models.UserRepository
-	jwtRepo  *jwtauth.TokenRepo
-	logger   *logger.Logger
-	domain   string
+	userRepo                           models.UserRepository
+	jwtRepo                            *jwtauth.TokenRepo
+	logger                             *logger.Logger
+	domain, rtCookieName, atCookieName string
 }
 
 func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtConf *config.ConfigJwt) error {
@@ -49,7 +49,8 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		domain = "127.0.0.1"
 		log.Println("[INFO] Server domain is not set. Set to '127.0.0.1' by default")
 	}
-	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger, domain: domain}
+	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger, domain: domain, atCookieName: "access-token", rtCookieName: "refresh-token"}
+	v1.Use(h.AuthTokenMiddleware)
 	v1.GET("/hello", func(c *gin.Context) {
 		c.JSON(http.StatusOK, gin.H{"msg": "hello client!"})
 	})

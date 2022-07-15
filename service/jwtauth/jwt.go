@@ -63,3 +63,15 @@ func newToken(tr *TokenRepo, type_ string, userId int64) (string, error) {
 	}
 	return "", errors.New("invalid token type: '" + type_ + "\n")
 }
+
+// use *AccessToken as the claims. RefreshToken, and AccessToken is the same basically
+func (tr *TokenRepo) ParseToken(raw string) (*jwt.Token, *AccessToken, error) {
+	claims := &AccessToken{}
+	tok, err := jwt.ParseWithClaims(raw, claims, func(t *jwt.Token) (interface{}, error) {
+		return []byte(tr.cfg.SecretKey), nil
+	})
+	if err != nil {
+		return nil, nil, err
+	}
+	return tok, claims, nil
+}

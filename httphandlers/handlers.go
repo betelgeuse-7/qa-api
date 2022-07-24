@@ -2,7 +2,6 @@ package httphandlers
 
 import (
 	"log"
-	"net/http"
 	"os"
 
 	"github.com/betelgeuse-7/qa/config"
@@ -23,10 +22,10 @@ func NewEngine(engine *gin.Engine) *Engine {
 }
 
 type Handler struct {
-	userRepo                           models.UserRepository
-	jwtRepo                            *jwtauth.TokenRepo
-	logger                             *logger.Logger
-	domain, rtCookieName, atCookieName string
+	userRepo             models.UserRepository
+	jwtRepo              *jwtauth.TokenRepo
+	logger               *logger.Logger
+	domain, atCookieName string
 }
 
 func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtConf *config.ConfigJwt) error {
@@ -49,12 +48,14 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		domain = "127.0.0.1"
 		log.Println("[INFO] Server domain is not set. Set to '127.0.0.1' by default")
 	}
-	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger, domain: domain, atCookieName: "access-token", rtCookieName: "refresh-token"}
-	v1.Use(h.AuthTokenMiddleware)
-	v1.GET("/hello", func(c *gin.Context) {
-		c.JSON(http.StatusOK, gin.H{"msg": "hello client!"})
-	})
+	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger, domain: domain, atCookieName: "access-token"}
 	users := v1.Group("/users")
 	users.POST("/", h.NewUser)
+
+	secured := v1.Group("/secure")
+	secured.Use(h.AuthTokenMiddleware)
+	secured.GET("/x", func(ctx *gin.Context) {
+		ctx.String(200, " HEEEEEEEEEEEEEEEEEEEEEEEEEY\nuser_id=%d\n", ctx.GetInt64(ContextUserIdKey))
+	})
 	return nil
 }

@@ -6,7 +6,7 @@ import (
 )
 
 func main() {
-	conf := &config.AppConfig{}
+	conf := config.NewAppConfig()
 	if err := conf.Parse("./config/conf.json"); err != nil {
 		panic("Parsing conf.json: " + err.Error() + "\n")
 	}

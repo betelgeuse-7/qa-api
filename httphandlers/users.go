@@ -40,15 +40,8 @@ func (h *Handler) NewUser(c *gin.Context) {
 		h.logger.Error("NewUser: %s\n", err.Error())
 		return
 	}
-	rt, err := h.jwtRepo.NewToken(userId, jwtauth.NewRefreshToken)
-	if err != nil {
-		c.Status(http.StatusInternalServerError)
-		h.logger.Error("NewUser: %s\n", err.Error())
-		return
-	}
 	cookieSecure := false
 	cookieHttpOnly := true
 	c.SetCookie(h.atCookieName, at, int(jwtauth.AT_EXPIRY.Seconds()), "/", h.domain, cookieSecure, cookieHttpOnly)
-	c.SetCookie(h.rtCookieName, rt, int(jwtauth.RT_EXPIRY.Seconds()), "/", h.domain, cookieSecure, cookieHttpOnly)
 	c.JSON(http.StatusCreated, gin.H{"message": "user registered successfully"})
 }

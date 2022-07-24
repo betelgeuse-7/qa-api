@@ -14,6 +14,14 @@ type AppConfig struct {
 	HttpServer   ConfigHttpServer
 }
 
+func NewAppConfig() *AppConfig {
+	return &AppConfig{
+		RelationalDB: ConfigRelationalDB{},
+		Auth:         ConfigAuth{},
+		HttpServer:   ConfigHttpServer{},
+	}
+}
+
 func (a *AppConfig) Parse(file string) error {
 	if ext := filepath.Ext(file); ext != ".json" {
 		return fmt.Errorf("expected a json file, got %s", ext)

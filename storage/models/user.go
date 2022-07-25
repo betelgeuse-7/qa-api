@@ -12,6 +12,7 @@ import (
 
 type UserRepository interface {
 	Register(*UserRegisterPayload) (int64, error)
+	GetUserLoginResults(string) (UserLoginResults, error)
 }
 
 type UserRepo struct {
@@ -57,6 +58,30 @@ type UserLoginPayload struct {
 	Password string `db:"password" json:"password"`
 }
 
+// the information necessary for the controller, for authorization purposes
+type UserLoginResults struct {
+	Pwd    string `db:"password"`
+	UserId int64  `db:"user_id"`
+}
+
+func (u *UserLoginPayload) Validate() []string {
+	errs := []string{}
+	if len(u.Email) == 0 {
+		errs = append(errs, "missing email")
+	}
+	if len(u.Email) > 0 {
+		if !(strings.Contains(u.Email, "@")) {
+			errs = append(errs, "invalid email")
+		}
+	}
+	if len(u.Password) == 0 {
+		errs = append(errs, "missing password")
+	} else if len(u.Password) < 6 {
+		errs = append(errs, "password not long enough")
+	}
+	return errs
+}
+
 type UserProfileResponse struct {
 	Username      string            `db:"username" json:"username"`
 	Email         string            `db:"email" json:"email"`
@@ -74,11 +99,14 @@ func (u *UserRepo) Register(payload *UserRegisterPayload) (int64, error) {
 		return -1, err
 	}
 	payload.Password = hasher.Hashed()
-	q, args, _ := u.sqlbuilder.Insert("users").
+	q, args, err := u.sqlbuilder.Insert("users").
 		Columns("username", "email", "handle", "password").
 		Values(payload.Username, payload.Email, payload.Handle, payload.Password).
 		Suffix("RETURNING user_id").
 		ToSql()
+	if err != nil {
+		return -1, err
+	}
 	// begin a transaction here, to make sure we don't insert a new row, in case we can't get the
 	// last inserted id. getting last inserted id is important, because we need it to build access,
 	// and refresh tokens upon registration.
@@ -95,4 +123,19 @@ func (u *UserRepo) Register(payload *UserRegisterPayload) (int64, error) {
 	}
 	tx.Commit()
 	return userId, nil
+}
+
+// returns bcrypt-hashed password, and an error
+func (u *UserRepo) GetUserLoginResults(email string) (UserLoginResults, error) {
+	ulr := UserLoginResults{}
+	q, args, err := u.sqlbuilder.Select("user_id", "password").From("users").Where(squirrel.Eq{
+		"email": email,
+	}).Limit(1).ToSql()
+	if err != nil {
+		return ulr, err
+	}
+	if err := u.db.Get(&ulr, q, args...); err != nil {
+		return ulr, err
+	}
+	return ulr, nil
 }

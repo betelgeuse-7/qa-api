@@ -26,9 +26,10 @@ type Handler struct {
 	jwtRepo              *jwtauth.TokenRepo
 	logger               *logger.Logger
 	domain, atCookieName string
+	useHTTPS             bool
 }
 
-func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtConf *config.ConfigJwt) error {
+func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtConf *config.ConfigJwt, useHTTPS bool) error {
 	r := e.ginEngine
 	v1 := r.Group("api/v1")
 	pg, err := postgres.New(relationalDbConf)
@@ -48,7 +49,10 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		domain = "127.0.0.1"
 		log.Println("[INFO] Server domain is not set. Set to '127.0.0.1' by default")
 	}
-	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger, domain: domain, atCookieName: "access-token"}
+	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger, domain: domain, atCookieName: "access-token", useHTTPS: useHTTPS}
+
+	v1.POST("/login", h.Login)
+
 	users := v1.Group("/users")
 	users.POST("/", h.NewUser)
 

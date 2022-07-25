@@ -24,7 +24,7 @@ func RunQARestAPI(conf *config.AppConfig) {
 		r.UseH2C = true
 	}
 	e := httphandlers.NewEngine(r)
-	if err := e.SetRESTRoutes(&conf.RelationalDB, &conf.Auth.Jwt); err != nil {
+	if err := e.SetRESTRoutes(&conf.RelationalDB, &conf.Auth.Jwt, conf.HttpServer.UseTLS); err != nil {
 		log.Printf("[ERROR] cmd/restapi.go: couldn't set REST routes: %s\n", err.Error())
 		return
 	}

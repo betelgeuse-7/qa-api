@@ -70,6 +70,7 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		questions.Use(h.AuthTokenMiddleware)
 		questions.POST("/", h.AskQuestion)
 		questions.GET("/:id", h.ViewQuestion)
+		questions.PUT("/:id", h.UpdateQuestion)
 	}
 
 	return nil

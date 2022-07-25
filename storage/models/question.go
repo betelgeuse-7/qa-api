@@ -12,9 +12,10 @@ import (
 
 type QuestionRepository interface {
 	NewQuestion(*NewQuestionPayload) (NewQuestionResponse, error)
-	GetQuestion(questionId int64) (ViewQuestionResponse, error)
+	GetQuestion(int64) (ViewQuestionResponse, error)
+	UpdateQuestion(int64, *UpdateQuestionPayload) (UpdateQuestionResponse, error)
 	//DeleteQuestion()
-	//UpdateQuestion()
+	GetAuthorIdOfQuestion(int64) (int64, error)
 }
 
 type QuestionRepo struct {
@@ -197,4 +198,67 @@ func (qr *QuestionRepo) getUpvoteAndDownvotesForQuestion(questionId int64) (uint
 		return 0, 0, fmt.Errorf("getUpvoteAndDownvotesForQuestion Scanning err: %s", err.Error())
 	}
 	return up, down, nil
+}
+
+type UpdateQuestionPayload struct {
+	Title string `json:"title"`
+	Text  string `json:"text"`
+}
+
+func (u *UpdateQuestionPayload) Validate() (res []string) {
+	res = []string{}
+	if len(u.Title) == 0 && len(u.Text) == 0 {
+		res = append(res, "empty payload")
+	}
+	return
+}
+
+type UpdateQuestionResponse struct {
+	QuestionId int64 `json:"question_id" db:"question_id"`
+	UpdateQuestionPayload
+}
+
+func (qr *QuestionRepo) UpdateQuestion(questionId int64, uqp *UpdateQuestionPayload) (UpdateQuestionResponse, error) {
+	res := UpdateQuestionResponse{}
+	whichFields := []string{}
+	if len(uqp.Text) > 0 {
+		whichFields = append(whichFields, "text")
+	}
+	if len(uqp.Title) > 0 {
+		whichFields = append(whichFields, "title")
+	}
+	updateBuilder := qr.sqlbuilder.Update("questions")
+	for _, v := range whichFields {
+		switch v {
+		case "text":
+			updateBuilder = updateBuilder.Set("text", uqp.Text)
+		default:
+			// title
+			updateBuilder = updateBuilder.Set("title", uqp.Title)
+		}
+	}
+	q, args, err := updateBuilder.Suffix("RETURNING question_id, title, text").ToSql()
+	if err != nil {
+		return res, err
+	}
+	row := qr.db.QueryRowx(q, args...)
+	err = row.StructScan(&res)
+	if err != nil {
+		return res, err
+	}
+	return res, nil
+}
+
+func (qr *QuestionRepo) GetAuthorIdOfQuestion(questionId int64) (int64, error) {
+	var authorId int64
+	q, args, err := qr.sqlbuilder.Select("question_by").From("questions").
+		Where(squirrel.Eq{"question_id": questionId}).Limit(1).ToSql()
+	if err != nil {
+		return -1, err
+	}
+	err = qr.db.Get(&authorId, q, args...)
+	if err != nil {
+		return -1, err
+	}
+	return authorId, nil
 }

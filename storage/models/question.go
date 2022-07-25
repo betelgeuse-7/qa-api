@@ -79,32 +79,122 @@ func (qr *QuestionRepo) NewQuestion(payload *NewQuestionPayload) (NewQuestionRes
 }
 
 type ViewQuestionResponse struct {
-	QuestionId    int64                 `json:"question_id" db:"question_id"`
-	Title         string                `json:"title" db:"title"`
-	Text          string                `json:"text" db:"text"`
-	CreatedAt     *time.Time            `json:"created_at" db:"created_at"`
-	Author        BasicUserResponse     `json:"author"`
-	Tags          []string              `json:"tags"`
-	UpvoteCount   uint64                `json:"upvotes"`
-	DownvoteCount uint64                `json:"downvotes"`
-	Answers       []BasicAnswerResponse `json:"answers"`
+	BasicUserResponse `json:"author"`
+	QuestionId        int64                 `json:"question_id" db:"question_id"`
+	Title             string                `json:"title" db:"title"`
+	Text              string                `json:"text" db:"text"`
+	CreatedAt         *time.Time            `json:"created_at" db:"created_at"`
+	UpvoteCount       uint64                `json:"upvotes"`
+	DownvoteCount     uint64                `json:"downvotes"`
+	Answers           []BasicAnswerResponse `json:"answers"`
+	Tags              []string              `json:"tags"`
 }
 
 func (qr *QuestionRepo) GetQuestion(questionId int64) (ViewQuestionResponse, error) {
 	res := ViewQuestionResponse{}
-	// ! HELP
-	// i am bad at sql
+	tags, err := qr.getTagsForQuestion(questionId)
+	if err != nil {
+		return res, err
+	}
+	res.Tags = tags
+	answers, err := qr.getAnswersForQuestion(questionId)
+	if err != nil {
+		return res, err
+	}
+	res.Answers = answers
+	upvotes, downvotes, err := qr.getUpvoteAndDownvotesForQuestion(questionId)
+	if err != nil {
+		return res, err
+	}
+	res.UpvoteCount = upvotes
+	res.DownvoteCount = downvotes
 	q, args, err := qr.sqlbuilder.Select("q.question_id", "q.title", "q.text", "q.created_at",
-		"u.username", "u.handle", "u.created_at",
-		"t.tag").From("questions q").InnerJoin("users u ON u.user_id = q.question_by").
-		InnerJoin("question_tags qt ON qt.question_id = q.question_id").
-		InnerJoin("tags t ON t.tag_id = qt.tag_id").
+		"u.username", "u.handle", "u.created_at").
+		From("questions q").
+		InnerJoin("users u ON u.user_id = q.question_by").
+		Where(squirrel.Eq{"q.question_id": questionId}).
 		ToSql()
 	if err != nil {
 		return res, err
 	}
-	fmt.Println("query: ", q)
-	fmt.Println("args: ", args)
-
+	fmt.Println(q, args)
+	row := qr.db.QueryRowx(q, args...)
+	err = row.StructScan(&res)
+	if err != nil {
+		return res, err
+	}
 	return res, nil
+}
+
+func (qr *QuestionRepo) getTagsForQuestion(questionId int64) ([]string, error) {
+	res := []string{}
+	tagsQuery, tagsQueryArgs, err := qr.sqlbuilder.Select("DISTINCT t.tag").From("tags t").
+		InnerJoin("question_tags qt ON qt.question_id = $1", questionId).
+		ToSql()
+	if err != nil {
+		return res, err
+	}
+	rows, err := qr.db.Queryx(tagsQuery, tagsQueryArgs...)
+	if err != nil {
+		return res, err
+	}
+	for rows.Next() {
+		var tag string
+		err = rows.Scan(&tag)
+		if err != nil {
+			return res, err
+		}
+		res = append(res, tag)
+	}
+	return res, nil
+}
+
+func (qr *QuestionRepo) getAnswersForQuestion(questionId int64) ([]BasicAnswerResponse, error) {
+	res := []BasicAnswerResponse{}
+	q, args, err := qr.sqlbuilder.Select("a.answer_id", "u.username", "u.handle", "u.created_at",
+		"a.text", "a.created_at").
+		From("answers a").InnerJoin("users u ON a.answer_by = u.user_id").
+		Where(squirrel.Eq{"a.to_question": questionId}).
+		ToSql()
+	if err != nil {
+		return res, err
+	}
+	rows, err := qr.db.Queryx(q, args...)
+	if err != nil {
+		return res, err
+	}
+	for rows.Next() {
+		var answer BasicAnswerResponse
+		err = rows.StructScan(&answer)
+		if err != nil {
+			return res, err
+		}
+		res = append(res, answer)
+	}
+	return res, nil
+}
+
+// return: 	upvotes, downvotes, error
+func (qr *QuestionRepo) getUpvoteAndDownvotesForQuestion(questionId int64) (uint64, uint64, error) {
+	q, args, err := qr.sqlbuilder.Select("COUNT(qu.question_id)").From("question_upvotes qu").
+		Where(squirrel.Eq{"qu.question_id": questionId}).ToSql()
+	if err != nil {
+		return 0, 0, err
+	}
+	q2, _, err := qr.sqlbuilder.Select("COUNT(qd.question_id)").From("question_downvotes qd").
+		Where(squirrel.Eq{"qd.question_id": questionId}).Limit(1).ToSql()
+	if err != nil {
+		return 0, 0, err
+	}
+	// i couldn't figure out how to create nested select statements using squirrel
+	// squirrel.Expr() maybe?
+	query := "SELECT " + "(" + q + ") AS upvotes, (" + q2 + ") AS downvotes;"
+	var up uint64
+	var down uint64
+	row := qr.db.QueryRowx(query, args...)
+	err = row.Scan(&up, &down)
+	if err != nil {
+		return 0, 0, fmt.Errorf("getUpvoteAndDownvotesForQuestion Scanning err: %s", err.Error())
+	}
+	return up, down, nil
 }

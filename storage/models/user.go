@@ -93,9 +93,10 @@ type UserProfileResponse struct {
 }
 
 type BasicUserResponse struct {
-	Username  string     `json:"username" db:"username"`
-	Handle    string     `json:"handle" db:"handle"`
-	CreatedAt *time.Time `json:"registered_at" db:"registered_at"`
+	Username string `json:"username" db:"username"`
+	Handle   string `json:"handle" db:"handle"`
+	// ? why isn't this populated when scanning results from db ? vvv
+	CreatedAt *time.Time `json:"registered_at" db:"created_at"`
 }
 
 func (u *UserRepo) Register(payload *UserRegisterPayload) (int64, error) {

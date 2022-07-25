@@ -1,7 +1,9 @@
 package httphandlers
 
 import (
+	"database/sql"
 	"net/http"
+	"strconv"
 
 	"github.com/betelgeuse-7/qa/storage/models"
 	"github.com/gin-gonic/gin"
@@ -39,8 +41,23 @@ func (h *Handler) AskQuestion(c *gin.Context) {
 }
 
 func (h *Handler) ViewQuestion(c *gin.Context) {
-	_, _ = h.questionRepo.GetQuestion(1)
-	c.String(200, "he")
+	questionIdStr := c.Param("id")
+	questionId, err := strconv.ParseInt(questionIdStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid path parameter. need an integer"})
+		return
+	}
+	q, err := h.questionRepo.GetQuestion(questionId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no such question"})
+			return
+		}
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.ViewQuestion: get question: %s\n", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, q)
 }
 
 func (h *Handler) UpdateQuestion(c *gin.Context) {

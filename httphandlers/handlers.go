@@ -23,6 +23,7 @@ func NewEngine(engine *gin.Engine) *Engine {
 
 type Handler struct {
 	userRepo             models.UserRepository
+	questionRepo         models.QuestionRepository
 	jwtRepo              *jwtauth.TokenRepo
 	logger               *logger.Logger
 	domain, atCookieName string
@@ -42,6 +43,7 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 	}
 	sqlbuilder := sqlbuild.New()
 	userRepo := models.NewUserRepo(pg.Db, sqlbuilder)
+	questionRepo := models.NewQuestionRepo(pg.Db, sqlbuilder)
 	jwtRepo := jwtauth.NewTokenRepo(jwtConf)
 	logger := logger.NewLogger(log.Default())
 	domain := os.Getenv("DOMAIN")
@@ -49,17 +51,26 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		domain = "127.0.0.1"
 		log.Println("[INFO] Server domain is not set. Set to '127.0.0.1' by default")
 	}
-	h := &Handler{userRepo: userRepo, jwtRepo: jwtRepo, logger: logger, domain: domain, atCookieName: "access-token", useHTTPS: useHTTPS}
 
+	h := &Handler{userRepo: userRepo,
+		questionRepo: questionRepo,
+		jwtRepo:      jwtRepo,
+		logger:       logger,
+		domain:       domain,
+		atCookieName: "access-token",
+		useHTTPS:     useHTTPS}
 	v1.POST("/login", h.Login)
+	v1.Use(h.RequestBodyIsJSON)
+	{
+		users := v1.Group("/users")
+		users.POST("/", h.NewUser)
+	}
+	{
+		questions := v1.Group("/questions")
+		questions.Use(h.AuthTokenMiddleware)
+		questions.POST("/", h.AskQuestion)
+		questions.GET("/:id", h.ViewQuestion)
+	}
 
-	users := v1.Group("/users")
-	users.POST("/", h.NewUser)
-
-	secured := v1.Group("/secure")
-	secured.Use(h.AuthTokenMiddleware)
-	secured.GET("/x", func(ctx *gin.Context) {
-		ctx.String(200, " HEEEEEEEEEEEEEEEEEEEEEEEEEY\nuser_id=%d\n", ctx.GetInt64(ContextUserIdKey))
-	})
 	return nil
 }

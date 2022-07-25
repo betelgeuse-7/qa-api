@@ -83,13 +83,19 @@ func (u *UserLoginPayload) Validate() []string {
 }
 
 type UserProfileResponse struct {
-	Username      string            `db:"username" json:"username"`
-	Email         string            `db:"email" json:"email"`
-	Handle        string            `db:"handle" json:"handle"`
-	LastOnline    *time.Time        `db:"last_online" json:"last_online"`
-	CreatedAt     *time.Time        `db:"created_at" json:"created_at"`
-	LastQuestions []*SingleQuestion `json:"last_questions"`
-	LastAnswers   []*SingleAnswer   `json:"last_answers"`
+	Username   string     `db:"username" json:"username"`
+	Email      string     `db:"email" json:"email"`
+	Handle     string     `db:"handle" json:"handle"`
+	LastOnline *time.Time `db:"last_online" json:"last_online"`
+	CreatedAt  *time.Time `db:"created_at" json:"created_at"`
+	//LastQuestions []*SingleQuestion `json:"last_questions"`
+	LastAnswers []*BasicAnswerResponse `json:"last_answers"`
+}
+
+type BasicUserResponse struct {
+	Username  string     `json:"username" db:"username"`
+	Handle    string     `json:"handle" db:"handle"`
+	CreatedAt *time.Time `json:"registered_at" db:"registered_at"`
 }
 
 func (u *UserRepo) Register(payload *UserRegisterPayload) (int64, error) {

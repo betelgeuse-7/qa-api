@@ -34,6 +34,7 @@ CREATE TABLE answers (
     answer_id serial primary key,
     answer_by int references users(user_id),
     text text not null,
+    to_question int references questions(question_id),
     created_at timestamp with time zone default CURRENT_TIMESTAMP,
     deleted_at timestamp with time zone
 );

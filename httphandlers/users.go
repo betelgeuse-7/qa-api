@@ -72,7 +72,7 @@ func (h *Handler) Login(c *gin.Context) {
 		return
 	}
 	if err := hashpwd.CompareHashAndPwd(ulr.Pwd, ulp.Password); err != nil {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "wrong password"})
+		c.JSON(http.StatusBadRequest, gin.H{"error": "wrong password"})
 		return
 	}
 	t, err := h.jwtRepo.NewToken(ulr.UserId, jwtauth.NewAccessToken)

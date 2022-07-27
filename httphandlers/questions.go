@@ -2,6 +2,7 @@ package httphandlers
 
 import (
 	"database/sql"
+	"fmt"
 	"net/http"
 	"strconv"
 
@@ -63,30 +64,11 @@ func (h *Handler) ViewQuestion(c *gin.Context) {
 // can only update the text or the title
 func (h *Handler) UpdateQuestion(c *gin.Context) {
 	var payload *models.UpdateQuestionPayload = &models.UpdateQuestionPayload{}
-	questionIdStr := c.Param("id")
-	questionId, err := strconv.ParseInt(questionIdStr, 10, 64)
+	questionId, err := getQuestionIdParam(c)
 	if err != nil {
-		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id parameter. need an integer"})
 		return
 	}
-	// check to see if the question belongs to the user
-	userId := c.GetInt64(ContextUserIdKey)
-	if userId <= 0 {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authorized"})
-		return
-	}
-	authorId, err := h.questionRepo.GetAuthorIdOfQuestion(questionId)
-	if err != nil {
-		if err == sql.ErrNoRows {
-			c.JSON(http.StatusNotFound, gin.H{"error": "no such question"})
-			return
-		}
-		c.Status(http.StatusInternalServerError)
-		h.logger.Error("*Handler.UpdateQuestion: GetAuthorIdOfQuestion: %s\n", err.Error())
-		return
-	}
-	if authorId != userId {
-		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+	if err := checkUserIsTheAuthorOfQuestion(h, c, questionId); err != nil {
 		return
 	}
 	err = c.BindJSON(payload)
@@ -117,5 +99,60 @@ func (h *Handler) UpdateQuestion(c *gin.Context) {
 }
 
 func (h *Handler) DeleteQuestion(c *gin.Context) {
+	questionId, err := getQuestionIdParam(c)
+	if err != nil {
+		return
+	}
+	if err := checkUserIsTheAuthorOfQuestion(h, c, questionId); err != nil {
+		return
+	}
+	err = h.questionRepo.DeleteQuestion(questionId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no such question"})
+			return
+		}
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.UpdateQuestion: UpdateQuestion: %s\n", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted question"})
+}
 
+func checkUserIsTheAuthorOfQuestion(h *Handler, c *gin.Context, questionId int64) error {
+	userId := c.GetInt64(ContextUserIdKey)
+	if userId <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authorized"})
+		return fmt.Errorf("err")
+	}
+	qs, err := h.questionRepo.GetQuestionStatus(questionId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no such question"})
+			return err
+		}
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.UpdateQuestion: GetAuthorIdOfQuestion: %s\n", err.Error())
+		return err
+	}
+	if userId != qs.AuthorId {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return fmt.Errorf("err")
+	}
+	// question's deleted_at column is set, which means, this question is deleted.
+	if qs.DeletedAt != nil {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no such question"})
+		return fmt.Errorf("err")
+	}
+	return nil
+}
+
+func getQuestionIdParam(c *gin.Context) (int64, error) {
+	questionIdStr := c.Param("id")
+	questionId, err := strconv.ParseInt(questionIdStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id parameter. need an integer"})
+		return -1, fmt.Errorf("err")
+	}
+	return questionId, nil
 }

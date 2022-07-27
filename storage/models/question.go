@@ -1,6 +1,7 @@
 package models
 
 import (
+	"database/sql"
 	"errors"
 	"fmt"
 	"time"
@@ -14,8 +15,8 @@ type QuestionRepository interface {
 	NewQuestion(*NewQuestionPayload) (NewQuestionResponse, error)
 	GetQuestion(int64) (ViewQuestionResponse, error)
 	UpdateQuestion(int64, *UpdateQuestionPayload) (UpdateQuestionResponse, error)
-	//DeleteQuestion()
-	GetAuthorIdOfQuestion(int64) (int64, error)
+	DeleteQuestion(int64) error
+	GetQuestionStatus(int64) (QuestionStatus, error)
 }
 
 type QuestionRepo struct {
@@ -93,6 +94,13 @@ type ViewQuestionResponse struct {
 
 func (qr *QuestionRepo) GetQuestion(questionId int64) (ViewQuestionResponse, error) {
 	res := ViewQuestionResponse{}
+	qs, err := qr.GetQuestionStatus(questionId)
+	if err != nil {
+		return res, err
+	}
+	if qs.DeletedAt != nil {
+		return res, sql.ErrNoRows
+	}
 	tags, err := qr.getTagsForQuestion(questionId)
 	if err != nil {
 		return res, err
@@ -118,7 +126,6 @@ func (qr *QuestionRepo) GetQuestion(questionId int64) (ViewQuestionResponse, err
 	if err != nil {
 		return res, err
 	}
-	fmt.Println(q, args)
 	row := qr.db.QueryRowx(q, args...)
 	err = row.StructScan(&res)
 	if err != nil {
@@ -237,7 +244,12 @@ func (qr *QuestionRepo) UpdateQuestion(questionId int64, uqp *UpdateQuestionPayl
 			updateBuilder = updateBuilder.Set("title", uqp.Title)
 		}
 	}
-	q, args, err := updateBuilder.Suffix("RETURNING question_id, title, text").ToSql()
+	q, args, err := updateBuilder.
+		Where(squirrel.Eq{
+			"question_id": questionId,
+			"deleted_at":  nil,
+		}).
+		Suffix("RETURNING question_id, title, text").ToSql()
 	if err != nil {
 		return res, err
 	}
@@ -249,16 +261,38 @@ func (qr *QuestionRepo) UpdateQuestion(questionId int64, uqp *UpdateQuestionPayl
 	return res, nil
 }
 
-func (qr *QuestionRepo) GetAuthorIdOfQuestion(questionId int64) (int64, error) {
-	var authorId int64
-	q, args, err := qr.sqlbuilder.Select("question_by").From("questions").
+type QuestionStatus struct {
+	AuthorId  int64      `db:"question_by"`
+	DeletedAt *time.Time `db:"deleted_at"`
+}
+
+func (qr *QuestionRepo) GetQuestionStatus(questionId int64) (QuestionStatus, error) {
+	var qs QuestionStatus
+	q, args, err := qr.sqlbuilder.Select("question_by", "deleted_at").From("questions").
 		Where(squirrel.Eq{"question_id": questionId}).Limit(1).ToSql()
 	if err != nil {
-		return -1, err
+		return qs, err
 	}
-	err = qr.db.Get(&authorId, q, args...)
+	row := qr.db.QueryRowx(q, args...)
+	err = row.StructScan(&qs)
 	if err != nil {
-		return -1, err
+		return qs, err
 	}
-	return authorId, nil
+	return qs, nil
+}
+
+func (qr *QuestionRepo) DeleteQuestion(questionId int64) error {
+	q, args, err := qr.sqlbuilder.Update("questions").
+		Set("deleted_at", time.Now()).
+		Where(squirrel.Eq{
+			"question_id": questionId,
+		}).ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = qr.db.Exec(q, args...)
+	if err != nil {
+		return err
+	}
+	return nil
 }

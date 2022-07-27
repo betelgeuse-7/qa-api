@@ -71,6 +71,7 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		questions.POST("/", h.AskQuestion)
 		questions.GET("/:id", h.ViewQuestion)
 		questions.PUT("/:id", h.UpdateQuestion)
+		questions.DELETE("/:id", h.DeleteQuestion)
 	}
 
 	return nil

@@ -1,7 +1,9 @@
 package httphandlers
 
 import (
+	"fmt"
 	"net/http"
+	"strconv"
 
 	"database/sql"
 
@@ -87,4 +89,39 @@ func (h *Handler) Login(c *gin.Context) {
 	c.SetCookie(h.atCookieName, t, cookieMaxAge, cookiePath, h.domain, h.useHTTPS, cookieHttpOnly)
 	c.Set(ContextUserIdKey, ulr.UserId)
 	c.JSON(http.StatusOK, gin.H{"message": "login successful (no redirect)"})
+}
+
+func (h *Handler) DeleteUser(c *gin.Context) {
+	userIdStr := c.Param("id")
+	userId, err := strconv.ParseInt(userIdStr, 10, 64)
+	if err != nil {
+		c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id parameter. need an integer"})
+		return
+	}
+	isDeleted, err := h.userRepo.IsUserDeleted(userId)
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no such user"})
+			return
+		}
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.DeleteUser: user is deleted: %s\n", err.Error())
+		return
+	}
+	contextUserId := c.GetInt64(ContextUserIdKey)
+	fmt.Println("delete user: ", contextUserId, userId)
+	if contextUserId != userId {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authorized"})
+		return
+	}
+	if isDeleted {
+		c.JSON(http.StatusNotFound, gin.H{"error": "no such user"})
+		return
+	}
+	if err := h.userRepo.DeleteUser(userId); err != nil {
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.DeleteUser: delete user: %s\n", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, gin.H{"message": "deleted user"})
 }

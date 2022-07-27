@@ -1,6 +1,7 @@
 package models
 
 import (
+	"fmt"
 	"strings"
 	"time"
 
@@ -13,6 +14,8 @@ import (
 type UserRepository interface {
 	Register(*UserRegisterPayload) (int64, error)
 	GetUserLoginResults(string) (UserLoginResults, error)
+	DeleteUser(int64) error
+	IsUserDeleted(int64) (bool, error)
 }
 
 type UserRepo struct {
@@ -136,7 +139,8 @@ func (u *UserRepo) Register(payload *UserRegisterPayload) (int64, error) {
 func (u *UserRepo) GetUserLoginResults(email string) (UserLoginResults, error) {
 	ulr := UserLoginResults{}
 	q, args, err := u.sqlbuilder.Select("user_id", "password").From("users").Where(squirrel.Eq{
-		"email": email,
+		"email":      email,
+		"deleted_at": nil,
 	}).Limit(1).ToSql()
 	if err != nil {
 		return ulr, err
@@ -145,4 +149,31 @@ func (u *UserRepo) GetUserLoginResults(email string) (UserLoginResults, error) {
 		return ulr, err
 	}
 	return ulr, nil
+}
+
+func (u *UserRepo) IsUserDeleted(userId int64) (bool, error) {
+	var deletedAt *time.Time
+	q, args, err := u.sqlbuilder.Select("deleted_at").From("users").Where(squirrel.Eq{
+		"user_id": userId,
+	}).ToSql()
+	if err != nil {
+		return true, fmt.Errorf("error construction query")
+	}
+	row := u.db.QueryRowx(q, args...)
+	row.Scan(&deletedAt)
+	return deletedAt != nil, nil
+}
+
+func (u *UserRepo) DeleteUser(userId int64) error {
+	q, args, err := u.sqlbuilder.Update("users").Set("deleted_at", time.Now()).Where(squirrel.Eq{
+		"user_id": userId,
+	}).ToSql()
+	if err != nil {
+		return err
+	}
+	_, err = u.db.Exec(q, args...)
+	if err != nil {
+		return err
+	}
+	return nil
 }

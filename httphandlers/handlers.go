@@ -64,6 +64,8 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 	{
 		users := v1.Group("/users")
 		users.POST("/", h.NewUser)
+		// TODO this doesn't work (use middleware)
+		users.DELETE("/:id", h.DeleteUser).Use(h.AuthTokenMiddleware, h.RequestBodyIsJSON)
 	}
 	{
 		questions := v1.Group("/questions")

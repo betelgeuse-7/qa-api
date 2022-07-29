@@ -17,6 +17,8 @@ type QuestionRepository interface {
 	UpdateQuestion(int64, *UpdateQuestionPayload) (UpdateQuestionResponse, error)
 	DeleteQuestion(int64) error
 	GetQuestionStatus(int64) (QuestionStatus, error)
+	UpvoteQuestion(int64, int64) error
+	DownvoteQuestion(int64, int64) error
 }
 
 type QuestionRepo struct {
@@ -255,10 +257,7 @@ func (qr *QuestionRepo) UpdateQuestion(questionId int64, uqp *UpdateQuestionPayl
 	}
 	row := qr.db.QueryRowx(q, args...)
 	err = row.StructScan(&res)
-	if err != nil {
-		return res, err
-	}
-	return res, nil
+	return res, err
 }
 
 type QuestionStatus struct {
@@ -275,10 +274,7 @@ func (qr *QuestionRepo) GetQuestionStatus(questionId int64) (QuestionStatus, err
 	}
 	row := qr.db.QueryRowx(q, args...)
 	err = row.StructScan(&qs)
-	if err != nil {
-		return qs, err
-	}
-	return qs, nil
+	return qs, err
 }
 
 func (qr *QuestionRepo) DeleteQuestion(questionId int64) error {
@@ -291,8 +287,33 @@ func (qr *QuestionRepo) DeleteQuestion(questionId int64) error {
 		return err
 	}
 	_, err = qr.db.Exec(q, args...)
+	return err
+}
+
+const (
+	ERROR_UPVOTE_OWN_QUESTION   = "cannot upvote own question"
+	ERROR_DOWNVOTE_OWN_QUESTION = "cannot downvote own question"
+)
+
+func (qr *QuestionRepo) UpvoteQuestion(questionId, upvoteBy int64) error {
+	// can't upvote own question
+	qs, err := qr.GetQuestionStatus(questionId)
 	if err != nil {
 		return err
 	}
-	return nil
+	if qs.AuthorId == upvoteBy {
+		return fmt.Errorf(ERROR_UPVOTE_OWN_QUESTION)
+	}
+	return voteQuestion(qr, "upvote", questionId, upvoteBy)
+}
+
+func (qr *QuestionRepo) DownvoteQuestion(questionId, downvoteBy int64) error {
+	qs, err := qr.GetQuestionStatus(questionId)
+	if err != nil {
+		return err
+	}
+	if qs.AuthorId == downvoteBy {
+		return fmt.Errorf(ERROR_DOWNVOTE_OWN_QUESTION)
+	}
+	return voteQuestion(qr, "downvote", questionId, downvoteBy)
 }

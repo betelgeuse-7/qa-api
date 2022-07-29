@@ -7,7 +7,9 @@ import (
 	"strconv"
 
 	"github.com/betelgeuse-7/qa/storage/models"
+	"github.com/betelgeuse-7/qa/storage/postgres"
 	"github.com/gin-gonic/gin"
+	"github.com/lib/pq"
 )
 
 func (h *Handler) AskQuestion(c *gin.Context) {
@@ -155,4 +157,60 @@ func getQuestionIdParam(c *gin.Context) (int64, error) {
 		return -1, fmt.Errorf("err")
 	}
 	return questionId, nil
+}
+
+func (h *Handler) UpvoteQuestion(c *gin.Context) {
+	err := voteQuestion(h, c, "upvote")
+	if err != nil {
+		return
+	}
+}
+
+func (h *Handler) DownvoteQuestion(c *gin.Context) {
+	err := voteQuestion(h, c, "downvote")
+	if err != nil {
+		return
+	}
+}
+
+func voteQuestion(h *Handler, c *gin.Context, type_ string) error {
+	questionId, err := getQuestionIdParam(c)
+	if err != nil {
+		return err
+	}
+	userId := c.GetInt64(ContextUserIdKey)
+	if userId <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "unauthorized"})
+		return fmt.Errorf("err")
+	}
+	ownQuestionErr := ""
+	switch type_ {
+	case "upvote":
+		ownQuestionErr = models.ERROR_UPVOTE_OWN_QUESTION
+		err = h.questionRepo.UpvoteQuestion(questionId, userId)
+	case "downvote":
+		ownQuestionErr = models.ERROR_DOWNVOTE_OWN_QUESTION
+		err = h.questionRepo.DownvoteQuestion(questionId, userId)
+	default:
+		return fmt.Errorf("httphandlers.voteQuestion: invalid vote type '%s'", type_)
+	}
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "no such question"})
+			return err
+		}
+		if err, ok := err.(*pq.Error); ok && err.Code == postgres.ERROR_UNIQUE_VIOLATION {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "already " + type_ + "d"})
+			return err
+		}
+		if errMsg := err.Error(); errMsg == ownQuestionErr {
+			c.JSON(http.StatusBadRequest, gin.H{"error": errMsg})
+			return err
+		}
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("httphandlers.voteQuestion: %s: %s\n", type_, err.Error())
+		return err
+	}
+	c.JSON(http.StatusCreated, gin.H{"message": type_ + "d question"})
+	return nil
 }

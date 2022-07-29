@@ -16,6 +16,7 @@ type UserRepository interface {
 	GetUserLoginResults(string) (UserLoginResults, error)
 	DeleteUser(int64) error
 	IsUserDeleted(int64) (bool, error)
+	GetUserProfile(int64) (UserProfileResponse, error)
 }
 
 type UserRepo struct {
@@ -83,16 +84,6 @@ func (u *UserLoginPayload) Validate() []string {
 		errs = append(errs, "password not long enough")
 	}
 	return errs
-}
-
-type UserProfileResponse struct {
-	Username   string     `db:"username" json:"username"`
-	Email      string     `db:"email" json:"email"`
-	Handle     string     `db:"handle" json:"handle"`
-	LastOnline *time.Time `db:"last_online" json:"last_online"`
-	CreatedAt  *time.Time `db:"created_at" json:"created_at"`
-	//LastQuestions []*SingleQuestion `json:"last_questions"`
-	LastAnswers []*BasicAnswerResponse `json:"last_answers"`
 }
 
 type BasicUserResponse struct {
@@ -176,4 +167,74 @@ func (u *UserRepo) DeleteUser(userId int64) error {
 		return err
 	}
 	return nil
+}
+
+type UserLastQuestionResponse struct {
+	Title     string     `db:"title" json:"title"`
+	Text      string     `db:"text" json:"text"`
+	CreatedAt *time.Time `db:"created_at" json:"asked_at"`
+	Link      string     `json:"link"`
+}
+
+type UserLastAnswerResponse struct {
+	Text       string     `db:"text" json:"text"`
+	ToQuestion string     `json:"to_question"`
+	CreatedAt  *time.Time `db:"created_at" json:"answered_at"`
+	Link       string     `json:"link"`
+}
+
+type UserProfileResponse struct {
+	Username       string                     `db:"username" json:"username"`
+	Handle         string                     `db:"handle" json:"handle"`
+	CreatedAt      *time.Time                 `db:"created_at" json:"registered_at"`
+	TotalUpvotes   int64                      `json:"total_upvotes"`
+	TotalDownvotes int64                      `json:"total_downvotes"`
+	LastQuestions  []UserLastQuestionResponse `json:"last_questions"`
+	LastAnswers    []UserLastAnswerResponse   `json:"last_answers"`
+}
+
+func (u *UserRepo) GetUserProfile(userId int64) (UserProfileResponse, error) {
+	res := UserProfileResponse{}
+	q, args, err := u.sqlbuilder.Select("u.username", "u.handle", "u.created_at",
+		"q.question_id", "q.title", "q.text", "q.created_at", "a.answer_id", "a.text",
+		"a.created_at",
+	).From("users u").InnerJoin("questions q ON q.question_by = u.user_id").
+		InnerJoin("answers a ON a.answer_by = u.user_id").
+		Where(squirrel.Eq{"user_id": userId, "deleted_at": nil}).
+		Limit(10).
+		ToSql()
+	rows, err := u.db.Queryx(q, args...)
+	if err != nil {
+		return res, err
+	}
+	// TODO Vvvv
+	for rows.Next() {
+		rows.StructScan(&res)
+		fmt.Println("RES=", res)
+	}
+
+	return res, nil
+}
+
+// upvotes, downvotes, error
+func (u *UserRepo) getTotalUpvoteDownvotes(userId int64) (int64, int64, error) {
+	q, args, err := u.sqlbuilder.Select("COUNT(qu.question_id)").From("question_upvotes qu").
+		Where(squirrel.Eq{
+			"qu.upvote_by": userId,
+		}).Suffix("AS upvotes").ToSql()
+	if err != nil {
+		return -1, -1, err
+	}
+	q2, args, err := u.sqlbuilder.Select("COUNT(qd.question_id)").From("question_downvotes qd").
+		Where(squirrel.Eq{
+			"qd.downvote_by": userId,
+		}).Suffix("AS downvotes").ToSql()
+	if err != nil {
+		return -1, -1, err
+	}
+	query := "SELECT " + "(" + q + ") AS upvotes, (" + q2 + ") AS downvotes;"
+	var up, down int64
+	row := u.db.QueryRowx(query, args...)
+	err = row.Scan(&up, &down)
+	return up, down, err
 }

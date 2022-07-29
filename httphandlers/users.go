@@ -125,3 +125,13 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 	}
 	c.JSON(http.StatusOK, gin.H{"message": "deleted user"})
 }
+
+func (h *Handler) ViewUserProfile(c *gin.Context) {
+	userId := c.GetInt64(ContextUserIdKey)
+	if userId <= 0 {
+		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authorized"})
+		return
+	}
+	_, _ = h.userRepo.GetUserProfile(userId)
+	c.String(200, "ok")
+}

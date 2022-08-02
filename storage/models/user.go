@@ -16,7 +16,7 @@ type UserRepository interface {
 	GetUserLoginResults(string) (UserLoginResults, error)
 	DeleteUser(int64) error
 	IsUserDeleted(int64) (bool, error)
-	GetUserProfile(int64) (UserProfileResponse, error)
+	GetUserProfile(int64, ServerInfo) (UserProfileResponse, error)
 }
 
 type UserRepo struct {
@@ -170,17 +170,18 @@ func (u *UserRepo) DeleteUser(userId int64) error {
 }
 
 type UserLastQuestionResponse struct {
-	Title     string     `db:"title" json:"title"`
-	Text      string     `db:"text" json:"text"`
-	CreatedAt *time.Time `db:"created_at" json:"asked_at"`
-	Link      string     `json:"link"`
+	Id        int64      `db:"question_id" json:"-"`
+	Title     string     `db:"question_title" json:"title"`
+	Text      string     `db:"question_text" json:"question_text"`
+	CreatedAt *time.Time `db:"question_created_at" json:"asked_at"`
+	Link      string     `json:"question_link"`
 }
 
 type UserLastAnswerResponse struct {
-	Text       string     `db:"text" json:"text"`
-	ToQuestion string     `json:"to_question"`
-	CreatedAt  *time.Time `db:"created_at" json:"answered_at"`
-	Link       string     `json:"link"`
+	Id        int64      `db:"answer_id" json:"-"`
+	Text      string     `db:"answer_text" json:"answer_text"`
+	CreatedAt *time.Time `db:"answer_created_at" json:"answered_at"`
+	Link      string     `json:"answer_link"`
 }
 
 type UserProfileResponse struct {
@@ -193,26 +194,67 @@ type UserProfileResponse struct {
 	LastAnswers    []UserLastAnswerResponse   `json:"last_answers"`
 }
 
-func (u *UserRepo) GetUserProfile(userId int64) (UserProfileResponse, error) {
+// I couldn't figure out how to scan a query like:
+/* u.sqlbuilder.Select("u.username", "u.handle", "u.created_at",
+"q.title", "q.text", "q.created_at", "a.text", "a.created_at").From("users u").
+InnerJoin("questions q ON q.question_by = $1", userId).
+InnerJoin("answers a ON a.answer_by = $1", userId).
+Limit(10).ToSql()*/
+// to UserProfileResponse, because it includes a slice field.
+// I am creating this struct, so it will be easier to scan every row to one of these,
+// in a for rows.Next() loop.
+type userProfileResponseScannable struct {
+	Username  string     `db:"username"`
+	Handle    string     `db:"handle"`
+	CreatedAt *time.Time `db:"created_at"`
+	UserLastQuestionResponse
+	UserLastAnswerResponse
+}
+
+type ServerInfo struct {
+	Domain string
+	Ssl    bool
+}
+
+func (u *UserRepo) GetUserProfile(userId int64, serverInfo ServerInfo) (UserProfileResponse, error) {
 	res := UserProfileResponse{}
 	q, args, err := u.sqlbuilder.Select("u.username", "u.handle", "u.created_at",
-		"q.question_id", "q.title", "q.text", "q.created_at", "a.answer_id", "a.text",
-		"a.created_at",
-	).From("users u").InnerJoin("questions q ON q.question_by = u.user_id").
-		InnerJoin("answers a ON a.answer_by = u.user_id").
-		Where(squirrel.Eq{"user_id": userId, "deleted_at": nil}).
-		Limit(10).
-		ToSql()
+		"q.question_id", "q.title AS question_title", "q.text AS question_text", "q.created_at AS question_created_at",
+		"a.answer_id", "a.text AS answer_text", "a.created_at AS answer_created_at").From("users u").
+		InnerJoin("questions q ON q.question_by = $1", userId).
+		InnerJoin("answers a ON a.answer_by = $2", userId).
+		Limit(10).ToSql()
+	if err != nil {
+		return res, err
+	}
 	rows, err := u.db.Queryx(q, args...)
 	if err != nil {
 		return res, err
 	}
-	// TODO Vvvv
+	i := 0
 	for rows.Next() {
-		rows.StructScan(&res)
-		fmt.Println("RES=", res)
+		var uprScannable userProfileResponseScannable
+		rows.StructScan(&uprScannable)
+		uprScannable.UserLastAnswerResponse.Link = generateLink(serverInfo.Domain, "answers", uprScannable.UserLastAnswerResponse.Id, serverInfo.Ssl)
+		uprScannable.UserLastQuestionResponse.Link = generateLink(serverInfo.Domain, "questions", uprScannable.UserLastQuestionResponse.Id, serverInfo.Ssl)
+		res.LastAnswers = append(res.LastAnswers, uprScannable.UserLastAnswerResponse)
+		res.LastQuestions = append(res.LastQuestions, uprScannable.UserLastQuestionResponse)
+		if i == 0 {
+			res.Username = uprScannable.Username
+			res.Handle = uprScannable.Handle
+			res.CreatedAt = uprScannable.CreatedAt
+		}
+		i++
 	}
-
+	if err := rows.Err(); err != nil {
+		return res, err
+	}
+	downs, ups, err := u.getTotalUpvoteDownvotes(userId)
+	if err != nil {
+		return res, err
+	}
+	res.TotalDownvotes = downs
+	res.TotalUpvotes = ups
 	return res, nil
 }
 
@@ -221,14 +263,14 @@ func (u *UserRepo) getTotalUpvoteDownvotes(userId int64) (int64, int64, error) {
 	q, args, err := u.sqlbuilder.Select("COUNT(qu.question_id)").From("question_upvotes qu").
 		Where(squirrel.Eq{
 			"qu.upvote_by": userId,
-		}).Suffix("AS upvotes").ToSql()
+		}).ToSql()
 	if err != nil {
 		return -1, -1, err
 	}
-	q2, args, err := u.sqlbuilder.Select("COUNT(qd.question_id)").From("question_downvotes qd").
+	q2, _, err := u.sqlbuilder.Select("COUNT(qd.question_id)").From("question_downvotes qd").
 		Where(squirrel.Eq{
 			"qd.downvote_by": userId,
-		}).Suffix("AS downvotes").ToSql()
+		}).ToSql()
 	if err != nil {
 		return -1, -1, err
 	}
@@ -237,4 +279,17 @@ func (u *UserRepo) getTotalUpvoteDownvotes(userId int64) (int64, int64, error) {
 	row := u.db.QueryRowx(query, args...)
 	err = row.Scan(&up, &down)
 	return up, down, err
+}
+
+func generateLink(domain, resource string, id int64, ssl bool) string {
+	scheme := "http"
+	if ssl {
+		scheme += "s"
+	}
+	scheme += "://"
+	res := ""
+	domain = strings.TrimSuffix(domain, "/")
+	resource = strings.TrimSuffix(resource, "/")
+	res += fmt.Sprintf("%s%s/api/v1/%s/%d/", scheme, domain, resource, id)
+	return res
 }

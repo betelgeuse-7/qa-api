@@ -126,12 +126,22 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 	c.JSON(http.StatusOK, gin.H{"message": "deleted user"})
 }
 
+// TODO fix
 func (h *Handler) ViewUserProfile(c *gin.Context) {
 	userId := c.GetInt64(ContextUserIdKey)
 	if userId <= 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authorized"})
 		return
 	}
-	_, _ = h.userRepo.GetUserProfile(userId)
-	c.String(200, "ok")
+	upr, err := h.userRepo.GetUserProfile(userId, models.ServerInfo{Domain: h.domain, Ssl: h.useHTTPS})
+	if err != nil {
+		if err == sql.ErrNoRows {
+			c.JSON(http.StatusNotFound, gin.H{"error": "no such user"})
+			return
+		}
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.ViewUserProfile: %s\n", err.Error())
+		return
+	}
+	c.JSON(http.StatusOK, upr)
 }

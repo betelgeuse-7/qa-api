@@ -1,6 +1,7 @@
 package models
 
 import (
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -171,16 +172,16 @@ func (u *UserRepo) DeleteUser(userId int64) error {
 
 type UserLastQuestionResponse struct {
 	Id        int64      `db:"question_id" json:"-"`
-	Title     string     `db:"question_title" json:"title"`
-	Text      string     `db:"question_text" json:"question_text"`
-	CreatedAt *time.Time `db:"question_created_at" json:"asked_at"`
+	Title     string     `db:"title" json:"title"`
+	Text      string     `db:"text" json:"question_text"`
+	CreatedAt *time.Time `db:"created_at" json:"asked_at"`
 	Link      string     `json:"question_link"`
 }
 
 type UserLastAnswerResponse struct {
 	Id        int64      `db:"answer_id" json:"-"`
-	Text      string     `db:"answer_text" json:"answer_text"`
-	CreatedAt *time.Time `db:"answer_created_at" json:"answered_at"`
+	Text      string     `db:"text" json:"answer_text"`
+	CreatedAt *time.Time `db:"created_at" json:"answered_at"`
 	Link      string     `json:"answer_link"`
 }
 
@@ -194,23 +195,6 @@ type UserProfileResponse struct {
 	LastAnswers    []UserLastAnswerResponse   `json:"last_answers"`
 }
 
-// I couldn't figure out how to scan a query like:
-/* u.sqlbuilder.Select("u.username", "u.handle", "u.created_at",
-"q.title", "q.text", "q.created_at", "a.text", "a.created_at").From("users u").
-InnerJoin("questions q ON q.question_by = $1", userId).
-InnerJoin("answers a ON a.answer_by = $1", userId).
-Limit(10).ToSql()*/
-// to UserProfileResponse, because it includes a slice field.
-// I am creating this struct, so it will be easier to scan every row to one of these,
-// in a for rows.Next() loop.
-type userProfileResponseScannable struct {
-	Username  string     `db:"username"`
-	Handle    string     `db:"handle"`
-	CreatedAt *time.Time `db:"created_at"`
-	UserLastQuestionResponse
-	UserLastAnswerResponse
-}
-
 type ServerInfo struct {
 	Domain string
 	Ssl    bool
@@ -218,37 +202,24 @@ type ServerInfo struct {
 
 func (u *UserRepo) GetUserProfile(userId int64, serverInfo ServerInfo) (UserProfileResponse, error) {
 	res := UserProfileResponse{}
-	q, args, err := u.sqlbuilder.Select("u.username", "u.handle", "u.created_at",
-		"q.question_id", "q.title AS question_title", "q.text AS question_text", "q.created_at AS question_created_at",
-		"a.answer_id", "a.text AS answer_text", "a.created_at AS answer_created_at").From("users u").
-		InnerJoin("questions q ON q.question_by = $1", userId).
-		InnerJoin("answers a ON a.answer_by = $2", userId).
-		Limit(10).ToSql()
+	q, args, err := u.sqlbuilder.Select("username", "handle", "created_at").From("users").
+		Where(squirrel.Eq{"deleted_at": nil, "user_id": userId}).ToSql()
 	if err != nil {
 		return res, err
 	}
-	rows, err := u.db.Queryx(q, args...)
+	row := u.db.QueryRowx(q, args...)
+	row.StructScan(&res)
+	limit := uint64(10)
+	lastAnswers, err := u.getAnswersForUser(userId, limit, serverInfo)
 	if err != nil {
 		return res, err
 	}
-	i := 0
-	for rows.Next() {
-		var uprScannable userProfileResponseScannable
-		rows.StructScan(&uprScannable)
-		uprScannable.UserLastAnswerResponse.Link = generateLink(serverInfo.Domain, "answers", uprScannable.UserLastAnswerResponse.Id, serverInfo.Ssl)
-		uprScannable.UserLastQuestionResponse.Link = generateLink(serverInfo.Domain, "questions", uprScannable.UserLastQuestionResponse.Id, serverInfo.Ssl)
-		res.LastAnswers = append(res.LastAnswers, uprScannable.UserLastAnswerResponse)
-		res.LastQuestions = append(res.LastQuestions, uprScannable.UserLastQuestionResponse)
-		if i == 0 {
-			res.Username = uprScannable.Username
-			res.Handle = uprScannable.Handle
-			res.CreatedAt = uprScannable.CreatedAt
-		}
-		i++
-	}
-	if err := rows.Err(); err != nil {
+	lastQuestions, err := u.getQuestionsForUser(userId, limit, serverInfo)
+	if err != nil {
 		return res, err
 	}
+	res.LastAnswers = lastAnswers
+	res.LastQuestions = lastQuestions
 	downs, ups, err := u.getTotalUpvoteDownvotes(userId)
 	if err != nil {
 		return res, err
@@ -279,6 +250,66 @@ func (u *UserRepo) getTotalUpvoteDownvotes(userId int64) (int64, int64, error) {
 	row := u.db.QueryRowx(query, args...)
 	err = row.Scan(&up, &down)
 	return up, down, err
+}
+
+func (u *UserRepo) getAnswersForUser(userId int64, limit uint64, serverInfo ServerInfo) ([]UserLastAnswerResponse, error) {
+	_, ular, err := __getForUser(u, userId, limit, "answers", serverInfo)
+	return *ular, err
+}
+
+func (u *UserRepo) getQuestionsForUser(userId int64, limit uint64, serverInfo ServerInfo) ([]UserLastQuestionResponse, error) {
+	ulqr, _, err := __getForUser(u, userId, limit, "questions", serverInfo)
+	return *ulqr, err
+}
+
+func __getForUser(u *UserRepo, userId int64, limit uint64, table string, serverInfo ServerInfo) (*[]UserLastQuestionResponse, *[]UserLastAnswerResponse, error) {
+	var query string
+	var arguments []interface{}
+
+	switch table {
+	case "questions":
+		q, args, err := u.sqlbuilder.Select("question_id", "title", "text", "created_at").From("questions").
+			Where(squirrel.Eq{"deleted_at": nil, "question_by": userId}).Limit(limit).ToSql()
+		if err != nil {
+			return nil, nil, err
+		}
+		query = q
+		arguments = args
+	case "answers":
+		q, args, err := u.sqlbuilder.Select("answer_id", "text", "created_at").From("answers").
+			Where(squirrel.Eq{"deleted_at": nil, "answer_by": userId}).Limit(limit).ToSql()
+		if err != nil {
+			return nil, nil, err
+		}
+		query = q
+		arguments = args
+	default:
+		return nil, nil, errors.New("__getForUser: unknown table: '" + table + "'")
+	}
+	var lastAnswers []UserLastAnswerResponse
+	var lastQuestions []UserLastQuestionResponse
+
+	rows, err := u.db.Queryx(query, arguments...)
+	if err != nil {
+		return nil, nil, err
+	}
+	if table == "questions" {
+		var ulqr UserLastQuestionResponse
+		for rows.Next() {
+			rows.StructScan(&ulqr)
+			ulqr.Link = generateLink(serverInfo.Domain, "questions", ulqr.Id, serverInfo.Ssl)
+			lastQuestions = append(lastQuestions, ulqr)
+		}
+		err := rows.Err()
+		return &lastQuestions, nil, err
+	}
+	var ular UserLastAnswerResponse
+	for rows.Next() {
+		rows.StructScan(&ular)
+		ular.Link = generateLink(serverInfo.Domain, "answers", ular.Id, serverInfo.Ssl)
+		lastAnswers = append(lastAnswers, ular)
+	}
+	return nil, &lastAnswers, rows.Err()
 }
 
 func generateLink(domain, resource string, id int64, ssl bool) string {

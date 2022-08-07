@@ -9,6 +9,7 @@ import (
 	"github.com/Masterminds/squirrel"
 	"github.com/betelgeuse-7/qa/service/hashpwd"
 	"github.com/betelgeuse-7/qa/service/sqlbuild"
+	"github.com/betelgeuse-7/qa/storage/postgres"
 	"github.com/jmoiron/sqlx"
 )
 
@@ -200,15 +201,23 @@ type ServerInfo struct {
 	Ssl    bool
 }
 
+const POSTGRES_INVALID_ID = "max integer value exceeded"
+
 func (u *UserRepo) GetUserProfile(userId int64, serverInfo ServerInfo) (UserProfileResponse, error) {
 	res := UserProfileResponse{}
+	if userId > int64(postgres.MAX_INT_VAL) {
+		return res, errors.New(POSTGRES_INVALID_ID)
+	}
 	q, args, err := u.sqlbuilder.Select("username", "handle", "created_at").From("users").
 		Where(squirrel.Eq{"deleted_at": nil, "user_id": userId}).ToSql()
 	if err != nil {
 		return res, err
 	}
 	row := u.db.QueryRowx(q, args...)
-	row.StructScan(&res)
+	err = row.StructScan(&res)
+	if err != nil {
+		return res, err
+	}
 	limit := uint64(10)
 	lastAnswers, err := u.getAnswersForUser(userId, limit, serverInfo)
 	if err != nil {
@@ -254,11 +263,17 @@ func (u *UserRepo) getTotalUpvoteDownvotes(userId int64) (int64, int64, error) {
 
 func (u *UserRepo) getAnswersForUser(userId int64, limit uint64, serverInfo ServerInfo) ([]UserLastAnswerResponse, error) {
 	_, ular, err := __getForUser(u, userId, limit, "answers", serverInfo)
+	if ular == nil {
+		return []UserLastAnswerResponse{}, err
+	}
 	return *ular, err
 }
 
 func (u *UserRepo) getQuestionsForUser(userId int64, limit uint64, serverInfo ServerInfo) ([]UserLastQuestionResponse, error) {
 	ulqr, _, err := __getForUser(u, userId, limit, "questions", serverInfo)
+	if ulqr == nil {
+		return []UserLastQuestionResponse{}, err
+	}
 	return *ulqr, err
 }
 
@@ -296,7 +311,10 @@ func __getForUser(u *UserRepo, userId int64, limit uint64, table string, serverI
 	if table == "questions" {
 		var ulqr UserLastQuestionResponse
 		for rows.Next() {
-			rows.StructScan(&ulqr)
+			err = rows.StructScan(&ulqr)
+			if err != nil {
+				return nil, nil, err
+			}
 			ulqr.Link = generateLink(serverInfo.Domain, "questions", ulqr.Id, serverInfo.Ssl)
 			lastQuestions = append(lastQuestions, ulqr)
 		}
@@ -305,7 +323,10 @@ func __getForUser(u *UserRepo, userId int64, limit uint64, table string, serverI
 	}
 	var ular UserLastAnswerResponse
 	for rows.Next() {
-		rows.StructScan(&ular)
+		err = rows.StructScan(&ular)
+		if err != nil {
+			return nil, nil, err
+		}
 		ular.Link = generateLink(serverInfo.Domain, "answers", ular.Id, serverInfo.Ssl)
 		lastAnswers = append(lastAnswers, ular)
 	}

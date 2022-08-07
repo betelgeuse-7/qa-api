@@ -128,13 +128,21 @@ func (h *Handler) DeleteUser(c *gin.Context) {
 
 // TODO fix
 func (h *Handler) ViewUserProfile(c *gin.Context) {
-	userId := c.GetInt64(ContextUserIdKey)
-	if userId <= 0 {
+	contextUserId := c.GetInt64(ContextUserIdKey)
+	if contextUserId <= 0 {
 		c.JSON(http.StatusUnauthorized, gin.H{"error": "not authorized"})
+		return
+	}
+	userId, err := getInt64IdParam(c)
+	if err != nil {
 		return
 	}
 	upr, err := h.userRepo.GetUserProfile(userId, models.ServerInfo{Domain: h.domain, Ssl: h.useHTTPS})
 	if err != nil {
+		if err.Error() == models.POSTGRES_INVALID_ID {
+			c.JSON(http.StatusBadRequest, gin.H{"error": "invalid id"})
+			return
+		}
 		if err == sql.ErrNoRows {
 			c.JSON(http.StatusNotFound, gin.H{"error": "no such user"})
 			return

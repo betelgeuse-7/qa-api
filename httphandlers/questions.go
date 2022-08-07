@@ -66,7 +66,7 @@ func (h *Handler) ViewQuestion(c *gin.Context) {
 // can only update the text or the title
 func (h *Handler) UpdateQuestion(c *gin.Context) {
 	var payload *models.UpdateQuestionPayload = &models.UpdateQuestionPayload{}
-	questionId, err := getQuestionIdParam(c)
+	questionId, err := getInt64IdParam(c)
 	if err != nil {
 		return
 	}
@@ -101,7 +101,7 @@ func (h *Handler) UpdateQuestion(c *gin.Context) {
 }
 
 func (h *Handler) DeleteQuestion(c *gin.Context) {
-	questionId, err := getQuestionIdParam(c)
+	questionId, err := getInt64IdParam(c)
 	if err != nil {
 		return
 	}
@@ -149,7 +149,8 @@ func checkUserIsTheAuthorOfQuestion(h *Handler, c *gin.Context, questionId int64
 	return nil
 }
 
-func getQuestionIdParam(c *gin.Context) (int64, error) {
+// param is 'id'
+func getInt64IdParam(c *gin.Context) (int64, error) {
 	questionIdStr := c.Param("id")
 	questionId, err := strconv.ParseInt(questionIdStr, 10, 64)
 	if err != nil {
@@ -174,7 +175,7 @@ func (h *Handler) DownvoteQuestion(c *gin.Context) {
 }
 
 func voteQuestion(h *Handler, c *gin.Context, type_ string) error {
-	questionId, err := getQuestionIdParam(c)
+	questionId, err := getInt64IdParam(c)
 	if err != nil {
 		return err
 	}

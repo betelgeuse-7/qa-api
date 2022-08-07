@@ -12,7 +12,8 @@ import (
 
 // https://www.postgresql.org/docs/current/errcodes-appendix.html
 const (
-	ERROR_UNIQUE_VIOLATION = pq.ErrorCode("23505")
+	ERROR_UNIQUE_VIOLATION pq.ErrorCode = pq.ErrorCode("23505")
+	MAX_INT_VAL            int32        = 2147483647
 )
 
 type Postgres struct {

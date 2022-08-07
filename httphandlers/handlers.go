@@ -13,6 +13,7 @@ import (
 	"github.com/gin-gonic/gin"
 )
 
+// *gin.Engine wrapper
 type Engine struct {
 	ginEngine *gin.Engine
 }
@@ -24,6 +25,7 @@ func NewEngine(engine *gin.Engine) *Engine {
 type Handler struct {
 	userRepo             models.UserRepository
 	questionRepo         models.QuestionRepository
+	answerRepo           models.AnswerRepository
 	jwtRepo              *jwtauth.TokenRepo
 	logger               *logger.Logger
 	domain, atCookieName string
@@ -41,9 +43,11 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 	if err != nil {
 		return err
 	}
+	// DI
 	sqlbuilder := sqlbuild.New()
 	userRepo := models.NewUserRepo(pg.Db, sqlbuilder)
 	questionRepo := models.NewQuestionRepo(pg.Db, sqlbuilder)
+	answerRepo := models.NewAnswerRepo(pg.Db, sqlbuilder)
 	jwtRepo := jwtauth.NewTokenRepo(jwtConf)
 	logger := logger.NewLogger(log.Default())
 	domain := os.Getenv("DOMAIN")
@@ -55,6 +59,7 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 	h := &Handler{userRepo: userRepo,
 		questionRepo: questionRepo,
 		jwtRepo:      jwtRepo,
+		answerRepo:   answerRepo,
 		logger:       logger,
 		domain:       domain,
 		atCookieName: "access-token",
@@ -65,7 +70,6 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		users := v1.Group("/users")
 		users.POST("/", h.NewUser)
 		users.GET("/:id", h.AuthTokenMiddleware, h.ViewUserProfile)
-		// TODO this doesn't work (use middleware)
 		users.DELETE("/:id", h.AuthTokenMiddleware, h.RequestBodyIsJSON, h.DeleteUser)
 	}
 	{
@@ -77,6 +81,7 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		questions.GET("/downvote/:id", h.DownvoteQuestion)
 		questions.PUT("/:id", h.UpdateQuestion)
 		questions.DELETE("/:id", h.DeleteQuestion)
+		questions.POST("/answer/:id", h.NewAnswer)
 	}
 	return nil
 }

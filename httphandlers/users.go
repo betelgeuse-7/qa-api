@@ -15,6 +15,8 @@ import (
 	pq "github.com/lib/pq"
 )
 
+// TODO validation with Gin or validator
+
 func (h *Handler) NewUser(c *gin.Context) {
 	urp := &models.UserRegisterPayload{}
 	err := c.BindJSON(urp)

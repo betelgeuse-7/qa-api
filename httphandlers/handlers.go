@@ -83,5 +83,11 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		questions.DELETE("/:id", h.DeleteQuestion)
 		questions.POST("/answer/:id", h.NewAnswer)
 	}
+	{
+		answers := v1.Group("/answers")
+		answers.Use(h.AuthTokenMiddleware)
+		answers.PUT("/:id", h.UpdateAnswer)
+		answers.DELETE("/:id", h.DeleteAnswer)
+	}
 	return nil
 }

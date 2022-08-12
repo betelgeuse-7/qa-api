@@ -3,7 +3,6 @@ package config
 import (
 	"encoding/json"
 	"fmt"
-	"log"
 	"os"
 	"path/filepath"
 )
@@ -36,12 +35,7 @@ func (a *AppConfig) Parse(file string) error {
 	}
 	jwtSecret := os.Getenv("JWT_SECRET")
 	if len(jwtSecret) == 0 {
-		log.Println("*AppConfig.Parse: env variable 'JWT_SECRET' is not set. Reading ./JWT_SECRET_KEY")
-		bx, err := os.ReadFile("JWT_SECRET_KEY")
-		if err != nil {
-			return fmt.Errorf("[ERROR] error reading JWT_SECRET_KEY file: %s", err.Error())
-		}
-		a.Auth.Jwt.SecretKey = bx
+		return fmt.Errorf("*AppConfig.Parse: environment variable 'JWT_SECRET' is not set")
 	}
 	a.Auth.Jwt.SecretKey = []byte(jwtSecret)
 	return nil

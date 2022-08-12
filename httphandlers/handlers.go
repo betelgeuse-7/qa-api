@@ -8,9 +8,11 @@ import (
 	"github.com/betelgeuse-7/qa/service/jwtauth"
 	"github.com/betelgeuse-7/qa/service/logger"
 	"github.com/betelgeuse-7/qa/service/sqlbuild"
+	"github.com/betelgeuse-7/qa/service/validate"
 	"github.com/betelgeuse-7/qa/storage/models"
 	"github.com/betelgeuse-7/qa/storage/postgres"
 	"github.com/gin-gonic/gin"
+	"github.com/go-playground/validator/v10"
 )
 
 // *gin.Engine wrapper
@@ -28,6 +30,7 @@ type Handler struct {
 	answerRepo           models.AnswerRepository
 	jwtRepo              *jwtauth.TokenRepo
 	logger               *logger.Logger
+	validator            *validate.Validator
 	domain, atCookieName string
 	useHTTPS             bool
 }
@@ -50,6 +53,7 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 	answerRepo := models.NewAnswerRepo(pg.Db, sqlbuilder)
 	jwtRepo := jwtauth.NewTokenRepo(jwtConf)
 	logger := logger.NewLogger(log.Default())
+	validator := validate.New(validator.New())
 	domain := os.Getenv("DOMAIN")
 	if domain == "" {
 		domain = "127.0.0.1"
@@ -61,6 +65,7 @@ func (e *Engine) SetRESTRoutes(relationalDbConf *config.ConfigRelationalDB, jwtC
 		jwtRepo:      jwtRepo,
 		answerRepo:   answerRepo,
 		logger:       logger,
+		validator:    validator,
 		domain:       domain,
 		atCookieName: "access-token",
 		useHTTPS:     useHTTPS}

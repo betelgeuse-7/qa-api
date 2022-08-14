@@ -31,10 +31,10 @@ func NewUserRepo(db *sqlx.DB, builder *sqlbuild.Builder) *UserRepo {
 }
 
 type UserRegisterPayload struct {
-	Username string `json:"username" validate:"required,alphanum"`
-	Email    string `json:"email" validate:"required,email"`
-	Password string `json:"password" validate:"required,gt=6"`
-	Handle   string `json:"handle" validate:"required,startsnotwith=@"`
+	Username string `json:"username"`
+	Email    string `json:"email"`
+	Password string `json:"password"`
+	Handle   string `json:"handle"`
 }
 
 func (u *UserRegisterPayload) Validate() []string {

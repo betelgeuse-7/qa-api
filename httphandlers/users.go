@@ -25,18 +25,11 @@ func (h *Handler) NewUser(c *gin.Context) {
 		h.logger.Error("*Handler.NewUser: %s\n", err.Error())
 		return
 	}
-	errs := h.validator.Validate(urp)
+	errs := urp.Validate()
 	if len(errs) > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"errors": errs})
 		return
 	}
-	/*
-		errs := urp.Validate()
-		if len(errs) > 0 {
-			c.JSON(http.StatusBadRequest, gin.H{"errors": errs})
-			return
-		}
-	*/
 	userId, err := h.userRepo.Register(urp)
 	if err != nil {
 		if pqError, ok := err.(*pq.Error); ok && pqError.Code == postgres.ERROR_UNIQUE_VIOLATION {

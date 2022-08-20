@@ -25,7 +25,12 @@ func (h *Handler) NewUser(c *gin.Context) {
 		h.logger.Error("*Handler.NewUser: %s\n", err.Error())
 		return
 	}
-	errs := urp.Validate()
+	errs, err := urp.Validate()
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.NewUser: validate: %s\n", err.Error())
+		return
+	}
 	if len(errs) > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"errors": errs})
 		return

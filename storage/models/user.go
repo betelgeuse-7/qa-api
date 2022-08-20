@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/betelgeuse-7/okay"
 	"github.com/betelgeuse-7/qa/service/hashpwd"
 	"github.com/betelgeuse-7/qa/service/sqlbuild"
 	"github.com/betelgeuse-7/qa/storage/postgres"
@@ -37,26 +38,54 @@ type UserRegisterPayload struct {
 	Handle   string `json:"handle"`
 }
 
-func (u *UserRegisterPayload) Validate() []string {
-	errs := []string{}
-	if len(u.Username) == 0 {
-		errs = append(errs, "missing username")
+func (u *UserRegisterPayload) Okay() (okay.ValidationErrors, error) {
+	var res okay.ValidationErrors
+	ex, err := okay.Text(u.Username, "username").Required().Errors()
+	if err != nil {
+		return res, err
 	}
-	if len(u.Email) == 0 {
-		errs = append(errs, "missing email")
+	res = append(res, ex...)
+	ex, err = okay.Text(u.Email, "email").Required().IsEmail().Errors()
+	if err != nil {
+		return res, err
 	}
-	if len(u.Password) == 0 {
-		errs = append(errs, "missing password")
-	} else if len(u.Password) < 6 {
-		errs = append(errs, "password not long enough")
+	res = append(res, ex...)
+	ex, err = okay.Text(u.Password, "password").Required().MinLength(6).Errors()
+	if err != nil {
+		return res, err
 	}
-	if len(u.Handle) == 0 {
-		errs = append(errs, "missing handle")
+	res = append(res, ex...)
+	ex, err = okay.Text(u.Handle, "handle").Required().IsAlphanumeric().DoesNotStartWith("@").Errors()
+	if err != nil {
+		return res, err
 	}
-	if ok := strings.HasPrefix(u.Handle, "@"); ok {
-		errs = append(errs, "handle cannot start with '@'")
-	}
-	return errs
+	res = append(res, ex...)
+	return res, nil
+}
+
+func (u *UserRegisterPayload) Validate() ([]string, error) {
+	return okay.Validate(u)
+	/*
+		errs := []string{}
+		if len(u.Username) == 0 {
+			errs = append(errs, "missing username")
+		}
+		if len(u.Email) == 0 {
+			errs = append(errs, "missing email")
+		}
+		if len(u.Password) == 0 {
+			errs = append(errs, "missing password")
+		} else if len(u.Password) < 6 {
+			errs = append(errs, "password not long enough")
+		}
+		if len(u.Handle) == 0 {
+			errs = append(errs, "missing handle")
+		}
+		if ok := strings.HasPrefix(u.Handle, "@"); ok {
+			errs = append(errs, "handle cannot start with '@'")
+		}
+		return errs
+	*/
 }
 
 type UserLoginPayload struct {

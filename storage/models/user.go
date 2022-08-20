@@ -39,6 +39,9 @@ type UserRegisterPayload struct {
 }
 
 func (u *UserRegisterPayload) Okay() (okay.ValidationErrors, error) {
+	/* Too verbose... */
+	/* Error checking and appending */
+
 	var res okay.ValidationErrors
 	ex, err := okay.Text(u.Username, "username").Required().Errors()
 	if err != nil {

@@ -7,6 +7,7 @@ import (
 	"time"
 
 	"github.com/Masterminds/squirrel"
+	"github.com/betelgeuse-7/okay"
 	"github.com/betelgeuse-7/qa/service/sqlbuild"
 	"github.com/jmoiron/sqlx"
 )
@@ -39,6 +40,13 @@ type NewQuestionPayload struct {
 	Text   string `json:"text"`
 }
 
+func (nqp *NewQuestionPayload) Okay() (okay.ValidationErrors, error) {
+	o := okay.New()
+	o.Text(nqp.Title, "title").Required()
+	o.Text(nqp.Text, "text").Required()
+	return o.Errors()
+}
+
 type NewQuestionResponse struct {
 	QuestionId int64      `db:"question_id" json:"question_id"`
 	Title      string     `db:"title" json:"title"`
@@ -46,15 +54,8 @@ type NewQuestionResponse struct {
 	CreatedAt  *time.Time `db:"created_at" json:"created_at"`
 }
 
-func (nqp *NewQuestionPayload) Validate() []string {
-	errs := []string{}
-	if len(nqp.Title) == 0 {
-		errs = append(errs, "missing title")
-	}
-	if len(nqp.Text) == 0 {
-		errs = append(errs, "missing text")
-	}
-	return errs
+func (nqp *NewQuestionPayload) Validate() ([]string, error) {
+	return okay.Validate(nqp)
 }
 
 func (qr *QuestionRepo) NewQuestion(payload *NewQuestionPayload) (NewQuestionResponse, error) {
@@ -214,12 +215,15 @@ type UpdateQuestionPayload struct {
 	Text  string `json:"text"`
 }
 
-func (u *UpdateQuestionPayload) Validate() (res []string) {
-	res = []string{}
-	if len(u.Title) == 0 && len(u.Text) == 0 {
-		res = append(res, "empty payload")
-	}
-	return
+func (uqp *UpdateQuestionPayload) Okay() (okay.ValidationErrors, error) {
+	o := okay.New()
+	o.Text(uqp.Title, "title").Required()
+	o.Text(uqp.Text, "text").Required()
+	return o.Errors()
+}
+
+func (u *UpdateQuestionPayload) Validate() ([]string, error) {
+	return okay.Validate(u)
 }
 
 type UpdateQuestionResponse struct {

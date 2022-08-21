@@ -24,7 +24,13 @@ func (h *Handler) AskQuestion(c *gin.Context) {
 		h.logger.Error("*Handler.AskQuestion: bind json: %s\n", err.Error())
 		return
 	}
-	if validationErrs := nqp.Validate(); len(validationErrs) > 0 {
+	validationErrs, err := nqp.Validate()
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.AskQuestion: validate: %s\n", err.Error())
+		return
+	}
+	if len(validationErrs) > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"errors": validationErrs})
 		return
 	}
@@ -83,7 +89,13 @@ func (h *Handler) UpdateQuestion(c *gin.Context) {
 		h.logger.Error("*Handler.UpdateQuestion: bind json: %s\n", err.Error())
 		return
 	}
-	if validationErrs := payload.Validate(); len(validationErrs) > 0 {
+	validationErrs, err := payload.Validate()
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.UpdateQuestion: validate: %s\n", err.Error())
+		return
+	}
+	if len(validationErrs) > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"errors": validationErrs})
 		return
 	}

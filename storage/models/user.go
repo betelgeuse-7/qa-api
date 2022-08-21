@@ -39,61 +39,28 @@ type UserRegisterPayload struct {
 }
 
 func (u *UserRegisterPayload) Okay() (okay.ValidationErrors, error) {
-	/* Too verbose... */
-	/* Error checking and appending */
-
-	var res okay.ValidationErrors
-	ex, err := okay.Text(u.Username, "username").Required().Errors()
-	if err != nil {
-		return res, err
-	}
-	res = append(res, ex...)
-	ex, err = okay.Text(u.Email, "email").Required().IsEmail().Errors()
-	if err != nil {
-		return res, err
-	}
-	res = append(res, ex...)
-	ex, err = okay.Text(u.Password, "password").Required().MinLength(6).Errors()
-	if err != nil {
-		return res, err
-	}
-	res = append(res, ex...)
-	ex, err = okay.Text(u.Handle, "handle").Required().IsAlphanumeric().DoesNotStartWith("@").Errors()
-	if err != nil {
-		return res, err
-	}
-	res = append(res, ex...)
-	return res, nil
+	o := okay.New()
+	o.Text(u.Username, "username").Required().IsAlphanumeric()
+	o.Text(u.Email, "email").Required().IsEmail()
+	o.Text(u.Password, "password").Required().MinLength(6)
+	o.Text(u.Handle, "handle").Required().IsAlphanumeric().DoesNotStartWith("@")
+	return o.Errors()
 }
 
 func (u *UserRegisterPayload) Validate() ([]string, error) {
 	return okay.Validate(u)
-	/*
-		errs := []string{}
-		if len(u.Username) == 0 {
-			errs = append(errs, "missing username")
-		}
-		if len(u.Email) == 0 {
-			errs = append(errs, "missing email")
-		}
-		if len(u.Password) == 0 {
-			errs = append(errs, "missing password")
-		} else if len(u.Password) < 6 {
-			errs = append(errs, "password not long enough")
-		}
-		if len(u.Handle) == 0 {
-			errs = append(errs, "missing handle")
-		}
-		if ok := strings.HasPrefix(u.Handle, "@"); ok {
-			errs = append(errs, "handle cannot start with '@'")
-		}
-		return errs
-	*/
 }
 
 type UserLoginPayload struct {
 	Email    string `db:"email" json:"email"`
 	Password string `db:"password" json:"password"`
+}
+
+func (u *UserLoginPayload) Okay() (okay.ValidationErrors, error) {
+	o := okay.New()
+	o.Text(u.Email, "email").Required().IsEmail()
+	o.Text(u.Password, "password").Required().MinLength(6)
+	return o.Errors()
 }
 
 // the information necessary for the controller, for authorization purposes
@@ -102,22 +69,8 @@ type UserLoginResults struct {
 	UserId int64  `db:"user_id"`
 }
 
-func (u *UserLoginPayload) Validate() []string {
-	errs := []string{}
-	if len(u.Email) == 0 {
-		errs = append(errs, "missing email")
-	}
-	if len(u.Email) > 0 {
-		if !(strings.Contains(u.Email, "@")) {
-			errs = append(errs, "invalid email")
-		}
-	}
-	if len(u.Password) == 0 {
-		errs = append(errs, "missing password")
-	} else if len(u.Password) < 6 {
-		errs = append(errs, "password not long enough")
-	}
-	return errs
+func (u *UserLoginPayload) Validate() ([]string, error) {
+	return okay.Validate(u)
 }
 
 type BasicUserResponse struct {

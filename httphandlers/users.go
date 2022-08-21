@@ -65,7 +65,12 @@ func (h *Handler) Login(c *gin.Context) {
 		h.logger.Error("*Handler.Login: %s\n", err.Error())
 		return
 	}
-	validationErrs := ulp.Validate()
+	validationErrs, err := ulp.Validate()
+	if err != nil {
+		c.Status(http.StatusInternalServerError)
+		h.logger.Error("*Handler.Login: validate: %s\n", err.Error())
+		return
+	}
 	if len(validationErrs) > 0 {
 		c.JSON(http.StatusBadRequest, gin.H{"errors": validationErrs})
 		return
